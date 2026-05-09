@@ -58,6 +58,10 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Function"
     }
+    "TelegramBotToken": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
     "Users": {
       "name": string
       "type": "sst.aws.Dynamo"
@@ -77,6 +81,10 @@ declare module "sst" {
     "WeatherCache": {
       "name": string
       "type": "sst.aws.Dynamo"
+    }
+    "Web": {
+      "type": "sst.aws.StaticSite"
+      "url": string
     }
   }
 }

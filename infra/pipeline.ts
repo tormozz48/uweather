@@ -34,6 +34,7 @@ import {
 
 export const openWeatherApiKey = new sst.Secret('OpenWeatherApiKey');
 export const weatherApiKey = new sst.Secret('WeatherApiKey');
+export const telegramBotToken = new sst.Secret('TelegramBotToken');
 
 // ── Phase 2 Lambda functions ──────────────────────────────────────────────────
 

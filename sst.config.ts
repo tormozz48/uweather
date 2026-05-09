@@ -28,10 +28,10 @@ export default $config({
     // app-registry MUST be first — it registers the stack transform that tags
     // all subsequent resources with awsApplication = <Resource Group ARN>
     const { applicationArn } = await import('./infra/app-registry');
-    await import('./infra/storage');
-    await import('./infra/api');
-    await import('./infra/pipeline'); // Phase 2
-    // await import('./infra/web');       // Phase 4
+    await import('./infra/storage');   // DynamoDB tables, S3, CloudFront (images)
+    await import('./infra/pipeline');  // Secrets, Lambdas, Step Functions
+    await import('./infra/api');       // API Gateway + route Lambdas (Phase 4)
+    await import('./infra/web');       // Vite SPA StaticSite (Phase 4)
     // await import('./infra/monitoring'); // Phase 5
 
     return {
