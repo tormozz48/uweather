@@ -6,6 +6,30 @@
 
 declare module "sst" {
   export interface Resource {
+    "Api": {
+      "type": "sst.aws.ApiGatewayV2"
+      "url": string
+    }
+    "Forecasts": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
+    "ImagesCdn": {
+      "type": "sst.aws.Router"
+      "url": string
+    }
+    "Users": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
+    "UweatherImages": {
+      "name": string
+      "type": "sst.aws.Bucket"
+    }
+    "WeatherCache": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
   }
 }
 /// <reference path="sst-env.d.ts" />
