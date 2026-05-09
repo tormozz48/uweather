@@ -9,9 +9,9 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { Resource } from 'sst';
-import { transformOpenWeather } from '@uweather/core';
-import { createLogger, normalizeCity, toDateString } from '@uweather/core';
+import { createLogger, normalizeCity } from '@uweather/core';
 import type { UnifiedWeatherData } from '@uweather/core';
+import { fetchOpenWeather } from './openweather.client.js';
 
 const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const log = createLogger({ function: 'provider-openweather' });
@@ -32,17 +32,7 @@ export async function handler(input: ProviderInput): Promise<ProviderOutput> {
   const { city, date } = input;
   log.info('Fetching weather from OpenWeatherMap', { city });
 
-  const apiKey = Resource.OpenWeatherApiKey.value;
-  const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric`;
-
-  const response = await fetch(url);
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`OpenWeatherMap API error ${response.status}: ${body}`);
-  }
-
-  const raw: unknown = await response.json();
-  const data = transformOpenWeather(raw);
+  const data = await fetchOpenWeather(city, Resource.OpenWeatherApiKey.value);
 
   // Write to WeatherCache
   const cityNormalized = normalizeCity(city);
@@ -55,7 +45,6 @@ export async function handler(input: ProviderInput): Promise<ProviderOutput> {
         pk: `CACHE#${cityNormalized}`,
         sk: `${date}#openweather`,
         data,
-        rawResponse: JSON.stringify(raw),
         fetchedAt: data.fetchedAt,
         ttl,
       },

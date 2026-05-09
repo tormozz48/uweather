@@ -27,7 +27,7 @@ declare module "sst" {
       "type": "sst.aws.Function"
     }
     "OpenWeatherApiKey": {
-      "type": "sst.Secret"
+      "type": "sst.sst.Secret"
       "value": string
     }
     "OpenWeatherFn": {
@@ -46,13 +46,13 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Bucket"
     }
-    "WeatherApiKey": {
-      "type": "sst.Secret"
-      "value": string
-    }
     "WeatherApiFn": {
       "name": string
       "type": "sst.aws.Function"
+    }
+    "WeatherApiKey": {
+      "type": "sst.sst.Secret"
+      "value": string
     }
     "WeatherCache": {
       "name": string

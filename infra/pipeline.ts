@@ -204,10 +204,9 @@ export const forecastPipeline = new aws.sfn.StateMachine('ForecastPipeline', {
   roleArn: sfRole.arn,
   definition: smDefinition,
   type: 'STANDARD',
-  loggingConfiguration: {
-    level: 'ERROR',
-    includeExecutionData: false,
-  },
+  // Full logging (with CloudWatch log group destination) added in Phase 5 (observability).
+  // AWS requires a destination when level != OFF, so we leave it disabled here.
+  loggingConfiguration: { level: 'OFF' },
 });
 
 // ── Orchestrator Lambda ───────────────────────────────────────────────────────
