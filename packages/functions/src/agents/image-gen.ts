@@ -1,11 +1,14 @@
 /**
  * Agent 3 — Image Generation Lambda.
  *
- * Step Functions task: invoked on an image-cache MISS. Calls Amazon Titan
- * Image Generator v2 via Bedrock, uploads the resulting PNG to S3, and
- * returns the CloudFront URL plus the image cache key.
+ * Step Functions task: invoked on an image-cache MISS. Calls the Pixazo AI
+ * Stable Diffusion XL v1.0 API (free tier), downloads the resulting image,
+ * uploads it to S3, and returns the CloudFront URL plus the image cache key.
+ *
+ * API reference: https://www.pixazo.ai/models/stable-diffusion
+ * Endpoint: POST https://gateway.pixazo.ai/getImage/v1/getSDXLImage
+ * Auth header: Ocp-Apim-Subscription-Key
  */
-import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { Resource } from 'sst';
 import {
@@ -16,12 +19,10 @@ import {
 } from '@uweather/core';
 import type { ConsensusForecast, TimeSlot } from '@uweather/core';
 
-const bedrock = new BedrockRuntimeClient({});
 const s3 = new S3Client({});
 const log = createLogger({ function: 'agent-image-gen' });
 
-/** Amazon Titan Image Generator v2 model ID */
-const TITAN_MODEL_ID = 'amazon.titan-image-generator-v2:0';
+const PIXAZO_SDXL_URL = 'https://gateway.pixazo.ai/getImage/v1/getSDXLImage';
 
 export interface ImageGenInput {
   city: string;
@@ -53,46 +54,56 @@ export async function handler(input: ImageGenInput): Promise<ImageGenOutput> {
 
   const negativePrompt = buildImageGenNegativePrompt();
 
-  // Invoke Titan Image Generator v2
-  const bedrockResponse = await log.timed('Bedrock Titan - image-gen', () =>
-    bedrock.send(
-      new InvokeModelCommand({
-        modelId: TITAN_MODEL_ID,
-        contentType: 'application/json',
-        accept: 'application/json',
-        body: JSON.stringify({
-          taskType: 'TEXT_IMAGE',
-          textToImageParams: {
-            text: prompt,
-            negativeText: negativePrompt,
-          },
-          imageGenerationConfig: {
-            numberOfImages: 1,
-            quality: 'standard',
-            width: 1024,
-            height: 512,
-            cfgScale: 8.0,
-          },
-        }),
+  // Call Pixazo SDXL v1.0 API — returns a hosted image URL
+  const pixazoImageUrl = await log.timed('Pixazo SDXL - image-gen', async () => {
+    const response = await fetch(PIXAZO_SDXL_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Ocp-Apim-Subscription-Key': Resource.PixazoApiKey.value,
+      },
+      body: JSON.stringify({
+        prompt,
+        negative_prompt: negativePrompt,
+        height: 1024,
+        width: 1024,
+        num_steps: 20,
+        guidance_scale: 7,
       }),
-    ),
-  );
+    });
 
-  const responseBody = JSON.parse(
-    new TextDecoder().decode((bedrockResponse as { body: Uint8Array }).body),
-  ) as { images: string[]; error?: string | null };
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new Error(`Pixazo API error: ${response.status} ${response.statusText} — ${body}`);
+    }
 
-  if (responseBody.error) {
-    throw new Error(`Titan image generation error: ${responseBody.error}`);
-  }
+    const data = (await response.json()) as { imageUrl?: string };
+    if (!data.imageUrl) {
+      throw new Error('Agent3_ImageGen: Pixazo returned no imageUrl');
+    }
+    return data.imageUrl;
+  });
 
-  const base64Image = responseBody.images[0];
-  if (!base64Image) {
-    throw new Error('Agent3_ImageGen: Titan returned no images');
-  }
+  log.info('Pixazo image URL received', { pixazoImageUrl });
 
-  // Decode base64 → Buffer and upload to S3
-  const imageBuffer = Buffer.from(base64Image, 'base64');
+  // Download the generated image from Pixazo's CDN
+  const { imageBuffer, contentType } = await log.timed('Download image from Pixazo CDN', async () => {
+    const imageResponse = await fetch(pixazoImageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to download image from Pixazo CDN: ${imageResponse.status}`);
+    }
+    const arrayBuffer = await imageResponse.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    // Infer content type from the URL extension (Pixazo typically returns PNG)
+    const ext = pixazoImageUrl.split('?')[0].split('.').pop()?.toLowerCase();
+    const mime =
+      ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' :
+      ext === 'webp' ? 'image/webp' :
+      'image/png';
+    return { imageBuffer: buffer, contentType: mime };
+  });
+
   const s3Key = buildS3ImageKey(input.imageCacheKey);
 
   await log.timed('S3 PutObject - image upload', () =>
@@ -101,14 +112,14 @@ export async function handler(input: ImageGenInput): Promise<ImageGenOutput> {
         Bucket: Resource.UweatherImages.name,
         Key: s3Key,
         Body: imageBuffer,
-        ContentType: 'image/png',
+        ContentType: contentType,
         CacheControl: 'public, max-age=86400', // 24-hour browser cache
       }),
     ),
   );
 
   // Build the CloudFront URL from the CDN domain
-  const imageUrl = `https://${Resource.ImagesCdn.url}/${s3Key}`;
+  const imageUrl = `${Resource.ImagesCdn.url}/${s3Key}`;
 
   log.info('Image generated and uploaded', {
     city: input.city,

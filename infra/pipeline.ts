@@ -35,6 +35,7 @@ import {
 export const openWeatherApiKey = new sst.Secret('OpenWeatherApiKey');
 export const weatherApiKey = new sst.Secret('WeatherApiKey');
 export const telegramBotToken = new sst.Secret('TelegramBotToken');
+export const pixazoApiKey = new sst.Secret('PixazoApiKey');
 
 // ── Phase 2 Lambda functions ──────────────────────────────────────────────────
 
@@ -91,9 +92,9 @@ const checkImageCacheFunction = new sst.aws.Function('CheckImageCacheFn', {
 
 const agent3ImageGenFunction = new sst.aws.Function('Agent3ImageGenFn', {
   handler: 'packages/functions/src/agents/image-gen.handler',
-  link: [imagesBucket, imagesCdn],
+  link: [imagesBucket, imagesCdn, pixazoApiKey],
   timeout: '90 seconds',
-  memory: '1024 MB', // base64 decode + PNG buffer in memory
+  memory: '512 MB',
 });
 
 const saveForecastFunction = new sst.aws.Function('SaveForecastFn', {
@@ -107,12 +108,14 @@ const saveForecastFunction = new sst.aws.Function('SaveForecastFn', {
 //
 // Agent 1 + 2 use the Claude Haiku 4.5 *inference profile* (required for
 // on-demand throughput — direct foundation-model IDs are not supported for
-// this model). Agent 3 needs Titan Image Generator v2.
+// this model).
 //
 // Inference profile ARN pattern:
 //   arn:aws:bedrock:{region}::inference-profile/{profileId}
 // Foundation model ARN must also be allowed (inference profile delegates to it):
 //   arn:aws:bedrock:*::foundation-model/{modelId}
+//
+// Agent 3 (image generation) uses the Pixazo AI REST API — no Bedrock perms needed.
 
 const bedrockRegion = aws.getRegionOutput().name;
 const bedrockAccountId = aws.getCallerIdentityOutput().accountId;
@@ -133,19 +136,6 @@ const bedrockTextPolicy = $resolve([bedrockRegion, bedrockAccountId]).apply(([re
   }),
 );
 
-const bedrockImagePolicy = $resolve([bedrockRegion]).apply(([region]) =>
-  JSON.stringify({
-    Version: '2012-10-17',
-    Statement: [
-      {
-        Effect: 'Allow',
-        Action: 'bedrock:InvokeModel',
-        Resource: `arn:aws:bedrock:${region}::foundation-model/amazon.titan-image-generator-v2:0`,
-      },
-    ],
-  }),
-);
-
 // Attach Bedrock text permission to Agent 1 and Agent 2
 new aws.iam.RolePolicy('Agent1BedrockPolicy', {
   role: agent1CompareFunction.nodes.role.id,
@@ -155,12 +145,6 @@ new aws.iam.RolePolicy('Agent1BedrockPolicy', {
 new aws.iam.RolePolicy('Agent2BedrockPolicy', {
   role: agent2FunnyTextFunction.nodes.role.id,
   policy: bedrockTextPolicy,
-});
-
-// Attach Bedrock image permission to Agent 3
-new aws.iam.RolePolicy('Agent3BedrockPolicy', {
-  role: agent3ImageGenFunction.nodes.role.id,
-  policy: bedrockImagePolicy,
 });
 
 // ── Step Functions IAM role ───────────────────────────────────────────────────
@@ -246,6 +230,20 @@ function providerBranch(stateName: string, lambdaArn: string, providerName: stri
 const bedrockRetry = [
   {
     ErrorEquals: ['Bedrock.ThrottlingException', 'States.TaskFailed'],
+    MaxAttempts: 2,
+    IntervalSeconds: 5,
+    BackoffRate: 2.0,
+    JitterStrategy: 'FULL',
+  },
+];
+
+/**
+ * External HTTP API retry — retry 2× on any transient error with backoff.
+ * Used for Agent3 (Pixazo SDXL) which calls an external REST API.
+ */
+const httpRetry = [
+  {
+    ErrorEquals: ['States.ALL'],
     MaxAttempts: 2,
     IntervalSeconds: 5,
     BackoffRate: 2.0,
@@ -413,11 +411,11 @@ const smDefinition = $resolve([
             'imageCacheKey.$': '$.imageCache.imageCacheKey',
           },
           ResultPath: '$.generatedImage',
-          Retry: bedrockRetry,
+          Retry: httpRetry,
           Next: 'PrepareSaveFromGen',
         },
 
-        // Normalise inputs for SaveForecast — image from Titan generation
+        // Normalise inputs for SaveForecast — image from Pixazo generation
         PrepareSaveFromGen: {
           Type: 'Pass',
           Parameters: {

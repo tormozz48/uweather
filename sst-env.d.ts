@@ -54,6 +54,10 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Function"
     }
+    "PixazoApiKey": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
     "SaveForecastFn": {
       "name": string
       "type": "sst.aws.Function"
