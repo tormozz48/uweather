@@ -105,20 +105,32 @@ const saveForecastFunction = new sst.aws.Function('SaveForecastFn', {
 
 // ── Bedrock InvokeModel permissions ──────────────────────────────────────────
 //
-// Agent 1 + 2 need Claude 3.5 Haiku; Agent 3 needs Titan Image Generator v2.
-// IAM uses the model ARN wildcard pattern:
-//   arn:aws:bedrock:{region}::foundation-model/{modelId}
+// Agent 1 + 2 use the Claude Haiku 4.5 *inference profile* (required for
+// on-demand throughput — direct foundation-model IDs are not supported for
+// this model). Agent 3 needs Titan Image Generator v2.
+//
+// Inference profile ARN pattern:
+//   arn:aws:bedrock:{region}::inference-profile/{profileId}
+// Foundation model ARN must also be allowed (inference profile delegates to it):
+//   arn:aws:bedrock:*::foundation-model/{modelId}
 
 const bedrockRegion = aws.getRegionOutput().name;
+const bedrockAccountId = aws.getCallerIdentityOutput().accountId;
 
-const bedrockTextPolicy = $resolve([bedrockRegion]).apply(([region]) =>
+const bedrockTextPolicy = $resolve([bedrockRegion, bedrockAccountId]).apply(([region, accountId]) =>
   JSON.stringify({
     Version: '2012-10-17',
     Statement: [
       {
         Effect: 'Allow',
         Action: 'bedrock:InvokeModel',
-        Resource: `arn:aws:bedrock:${region}::foundation-model/anthropic.claude-3-5-haiku-20241022-v1:0`,
+        Resource: [
+          // Cross-region inference profiles are account-scoped — ARN includes account ID
+          `arn:aws:bedrock:${region}:${accountId}:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0`,
+          // Foundation model ARN is AWS-owned (no account ID) — required because the
+          // inference profile delegates invocations to the underlying foundation model
+          `arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0`,
+        ],
       },
     ],
   }),

@@ -18,8 +18,8 @@ import type { UnifiedWeatherData, ConsensusForecast } from '@uweather/core';
 const bedrock = new BedrockRuntimeClient({});
 const log = createLogger({ function: 'agent-compare' });
 
-/** Claude 3.5 Haiku model ID on Bedrock */
-const MODEL_ID = 'anthropic.claude-3-5-haiku-20241022-v1:0';
+/** Claude 4.5 Haiku inference profile ID on Bedrock (required for on-demand throughput) */
+const MODEL_ID = 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
 
 type ProviderResult =
   | UnifiedWeatherData

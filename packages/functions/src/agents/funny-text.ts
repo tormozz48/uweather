@@ -17,7 +17,7 @@ const bedrock = new BedrockRuntimeClient({});
 const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const log = createLogger({ function: 'agent-funny-text' });
 
-const MODEL_ID = 'anthropic.claude-3-5-haiku-20241022-v1:0';
+const MODEL_ID = 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
 const MAX_HISTORY_ITEMS = 5;
 
 export interface FunnyTextInput {

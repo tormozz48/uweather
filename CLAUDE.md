@@ -10,7 +10,7 @@ AI-powered weather app that delivers funny, location-aware forecasts with genera
 - **Cloud**: AWS (serverless-only)
 - **Telegram**: grammY (webhook mode, not polling)
 - **Web**: Vite + React SPA (anonymous, no auth)
-- **AI**: Amazon Bedrock (Claude 3.5 Haiku for text, Titan Image Generator v2 for images)
+- **AI**: Amazon Bedrock (Claude 4.5 Haiku for text, Titan Image Generator v2 for images)
 - **Database**: DynamoDB (multi-table, on-demand billing)
 - **Storage**: S3 (generated images) + CloudFront CDN
 - **Orchestration**: AWS Step Functions (parallel provider fetch → sequential AI pipeline)
