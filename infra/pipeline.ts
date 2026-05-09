@@ -125,10 +125,7 @@ const bedrockTextPolicy = $resolve([bedrockRegion, bedrockAccountId]).apply(([re
         Effect: 'Allow',
         Action: 'bedrock:InvokeModel',
         Resource: [
-          // Cross-region inference profiles are account-scoped — ARN includes account ID
           `arn:aws:bedrock:${region}:${accountId}:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0`,
-          // Foundation model ARN is AWS-owned (no account ID) — required because the
-          // inference profile delegates invocations to the underlying foundation model
           `arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0`,
         ],
       },
