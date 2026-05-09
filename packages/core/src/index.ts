@@ -43,3 +43,16 @@ export type {
   OMGeocodingResponse,
   OMWeatherResponse,
 } from './weather/index.js';
+
+export {
+  buildComparePrompt,
+  buildFunnyTextPrompt,
+  buildImageGenPrompt,
+  buildImageGenNegativePrompt,
+} from './prompts/index.js';
+
+export type {
+  ComparePromptParams,
+  FunnyTextPromptParams,
+  ImageGenPromptParams,
+} from './prompts/index.js';

@@ -14,7 +14,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { SFNClient, StartExecutionCommand } from '@aws-sdk/client-sfn';
 import { Resource } from 'sst';
-import { createLogger, normalizeCity, toDateString } from '@uweather/core';
+import { createLogger, normalizeCity, toDateString, getCurrentTimeSlot } from '@uweather/core';
 import type { UnifiedWeatherData, WeatherCacheEntry } from '@uweather/core';
 import { randomUUID } from 'node:crypto';
 
@@ -27,6 +27,8 @@ const CACHE_FRESH_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
 export interface OrchestratorInput {
   city: string;
   language?: string;
+  /** Telegram chatId or web sessionId — defaults to 'anonymous' until Phase 4 */
+  userId?: string;
 }
 
 export type OrchestratorOutput =
@@ -38,8 +40,10 @@ export async function handler(input: OrchestratorInput): Promise<OrchestratorOut
   if (!city) throw new Error('city is required');
 
   const language = input.language ?? 'en';
+  const userId = input.userId ?? 'anonymous';
   const cityNormalized = normalizeCity(city);
   const date = toDateString();
+  const timeSlot = getCurrentTimeSlot();
 
   log.info('Orchestrator invoked', { city: cityNormalized, language });
 
@@ -86,7 +90,7 @@ export async function handler(input: OrchestratorInput): Promise<OrchestratorOut
     new StartExecutionCommand({
       stateMachineArn,
       name: executionName,
-      input: JSON.stringify({ city: cityNormalized, language, date }),
+      input: JSON.stringify({ city: cityNormalized, language, date, userId, timeSlot }),
     }),
   );
 

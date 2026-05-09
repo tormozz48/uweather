@@ -6,11 +6,27 @@
 
 declare module "sst" {
   export interface Resource {
+    "Agent1CompareFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "Agent2FunnyTextFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "Agent3ImageGenFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
     "Api": {
       "type": "sst.aws.ApiGatewayV2"
       "url": string
     }
     "CheckCacheFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "CheckImageCacheFn": {
       "name": string
       "type": "sst.aws.Function"
     }
@@ -35,6 +51,10 @@ declare module "sst" {
       "type": "sst.aws.Function"
     }
     "OrchestratorFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "SaveForecastFn": {
       "name": string
       "type": "sst.aws.Function"
     }
