@@ -10,11 +10,10 @@ export default $config({
     };
   },
   async run() {
-    // Infra modules are imported and wired here in Phase 1+
-    // await import('./infra/storage');
-    // await import('./infra/api');
-    // await import('./infra/pipeline');
-    // await import('./infra/web');
-    // await import('./infra/monitoring');
+    await import('./infra/storage');
+    await import('./infra/api');
+    // await import('./infra/pipeline');  // Phase 2
+    // await import('./infra/web');       // Phase 4
+    // await import('./infra/monitoring'); // Phase 5
   },
 });

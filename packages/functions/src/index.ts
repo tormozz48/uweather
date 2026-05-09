@@ -1,3 +1,2 @@
 // @uweather/functions — Lambda handlers
-// Populated in Phase 1+
-export {};
+// Individual handlers are imported directly by SST via their file paths.

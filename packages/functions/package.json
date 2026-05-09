@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@uweather/core": "workspace:*"
+    "@uweather/core": "workspace:*",
+    "aws-lambda": "^1.0.7"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145"
   }
 }
