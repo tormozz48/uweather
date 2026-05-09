@@ -1,5 +1,9 @@
 .DS_Store
 
+# SST
+.sst/
+.open-next/
+
 # Logs
 logs
 *.log
