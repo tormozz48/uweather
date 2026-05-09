@@ -31,3 +31,15 @@ export type {
   TempBucket,
   ImageCacheKeyParams,
 } from './utils/index.js';
+
+export {
+  transformOpenWeather,
+  transformWeatherAPI,
+  transformOpenMeteo,
+} from './weather/index.js';
+
+export type {
+  OMGeocodingResult,
+  OMGeocodingResponse,
+  OMWeatherResponse,
+} from './weather/index.js';

@@ -10,6 +10,10 @@ declare module "sst" {
       "type": "sst.aws.ApiGatewayV2"
       "url": string
     }
+    "CheckCacheFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
     "Forecasts": {
       "name": string
       "type": "sst.aws.Dynamo"
@@ -18,6 +22,22 @@ declare module "sst" {
       "type": "sst.aws.Router"
       "url": string
     }
+    "OpenMeteoFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "OpenWeatherApiKey": {
+      "type": "sst.Secret"
+      "value": string
+    }
+    "OpenWeatherFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "OrchestratorFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
     "Users": {
       "name": string
       "type": "sst.aws.Dynamo"
@@ -25,6 +45,14 @@ declare module "sst" {
     "UweatherImages": {
       "name": string
       "type": "sst.aws.Bucket"
+    }
+    "WeatherApiKey": {
+      "type": "sst.Secret"
+      "value": string
+    }
+    "WeatherApiFn": {
+      "name": string
+      "type": "sst.aws.Function"
     }
     "WeatherCache": {
       "name": string

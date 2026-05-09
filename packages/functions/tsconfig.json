@@ -5,6 +5,6 @@
     "outDir": "dist",
     "rootDir": "src"
   },
-  "include": ["src"],
+  "include": ["src", "../../sst-env.d.ts"],
   "references": [{ "path": "../core" }]
 }
