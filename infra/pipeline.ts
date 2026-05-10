@@ -1,5 +1,6 @@
 /**
  * infra/pipeline.ts — Phase 3: full AI agents pipeline
+ *                     Phase 5 updates: X-Ray tracing, CloudWatch SFN logging
  *
  * Resources provisioned here:
  *  - SST Secrets: OpenWeatherApiKey, WeatherApiKey
@@ -10,6 +11,7 @@
  *      OrchestratorFn                                           (Phase 2, updated)
  *  - IAM execution role for Step Functions
  *  - Step Functions Standard Workflow: ForecastPipeline
+ *  - CloudWatch Log Group for SFN execution logs              (Phase 5)
  *
  * State machine flow (Phase 3):
  *
@@ -32,6 +34,41 @@ export const weatherApiKey = new sst.Secret('WeatherApiKey');
 export const telegramBotToken = new sst.Secret('TelegramBotToken');
 export const pixazoApiKey = new sst.Secret('PixazoApiKey');
 
+// ── CloudWatch Log Group for Step Functions ───────────────────────────────────
+//
+// SFN needs a log group to write execution-level events (ERROR level = state
+// transitions that fail). Kept for 30 days to balance cost vs debuggability.
+
+export const sfnLogGroup = new aws.cloudwatch.LogGroup('SfnLogGroup', {
+  name: $interpolate`/aws/states/uweather-forecast-${$app.stage}`,
+  retentionInDays: 30,
+});
+
+// ── Shared X-Ray transform ────────────────────────────────────────────────────
+//
+// Applied to every Lambda via `transform.function`. Sets tracingConfig to
+// Active so the X-Ray daemon samples and records segments from each invocation.
+
+const xrayTransform: sst.aws.FunctionArgs['transform'] = {
+  function: (args) => {
+    args.tracingConfig = { mode: 'Active' };
+  },
+};
+
+// X-Ray IAM permissions — required for the Lambda execution role to send
+// trace segments and telemetry to the X-Ray service.
+const xrayPermissions = [
+  {
+    actions: [
+      'xray:PutTraceSegments',
+      'xray:PutTelemetryRecords',
+      'xray:GetSamplingRules',
+      'xray:GetSamplingTargets',
+    ],
+    resources: ['*' as const],
+  },
+];
+
 // ── Phase 2 Lambda functions ──────────────────────────────────────────────────
 
 const checkCacheFunction = new sst.aws.Function('CheckCacheFn', {
@@ -39,6 +76,8 @@ const checkCacheFunction = new sst.aws.Function('CheckCacheFn', {
   link: [weatherCacheTable],
   timeout: '30 seconds',
   memory: '256 MB',
+  permissions: xrayPermissions,
+  transform: xrayTransform,
 });
 
 const openWeatherFunction = new sst.aws.Function('OpenWeatherFn', {
@@ -46,6 +85,8 @@ const openWeatherFunction = new sst.aws.Function('OpenWeatherFn', {
   link: [weatherCacheTable, openWeatherApiKey],
   timeout: '90 seconds',
   memory: '256 MB',
+  permissions: xrayPermissions,
+  transform: xrayTransform,
 });
 
 const weatherApiFunction = new sst.aws.Function('WeatherApiFn', {
@@ -53,6 +94,8 @@ const weatherApiFunction = new sst.aws.Function('WeatherApiFn', {
   link: [weatherCacheTable, weatherApiKey],
   timeout: '90 seconds',
   memory: '256 MB',
+  permissions: xrayPermissions,
+  transform: xrayTransform,
 });
 
 const openMeteoFunction = new sst.aws.Function('OpenMeteoFn', {
@@ -60,22 +103,28 @@ const openMeteoFunction = new sst.aws.Function('OpenMeteoFn', {
   link: [weatherCacheTable],
   timeout: '90 seconds',
   memory: '256 MB',
+  permissions: xrayPermissions,
+  transform: xrayTransform,
 });
 
 // ── Phase 3 Lambda functions ──────────────────────────────────────────────────
 
-const agent1CompareFunction = new sst.aws.Function('Agent1CompareFn', {
+export const agent1CompareFunction = new sst.aws.Function('Agent1CompareFn', {
   handler: 'packages/functions/src/agents/compare.handler',
   timeout: '90 seconds',
   memory: '512 MB',
   // Bedrock access via IAM role — no resource link needed
+  permissions: xrayPermissions,
+  transform: xrayTransform,
 });
 
-const agent2FunnyTextFunction = new sst.aws.Function('Agent2FunnyTextFn', {
+export const agent2FunnyTextFunction = new sst.aws.Function('Agent2FunnyTextFn', {
   handler: 'packages/functions/src/agents/funny-text.handler',
   link: [forecastsTable],
   timeout: '90 seconds',
   memory: '512 MB',
+  permissions: xrayPermissions,
+  transform: xrayTransform,
 });
 
 const checkImageCacheFunction = new sst.aws.Function('CheckImageCacheFn', {
@@ -83,6 +132,8 @@ const checkImageCacheFunction = new sst.aws.Function('CheckImageCacheFn', {
   link: [forecastsTable],
   timeout: '30 seconds',
   memory: '256 MB',
+  permissions: xrayPermissions,
+  transform: xrayTransform,
 });
 
 const agent3ImageGenFunction = new sst.aws.Function('Agent3ImageGenFn', {
@@ -90,6 +141,8 @@ const agent3ImageGenFunction = new sst.aws.Function('Agent3ImageGenFn', {
   link: [imagesBucket, imagesCdn, pixazoApiKey],
   timeout: '90 seconds',
   memory: '512 MB',
+  permissions: xrayPermissions,
+  transform: xrayTransform,
 });
 
 const saveForecastFunction = new sst.aws.Function('SaveForecastFn', {
@@ -97,6 +150,8 @@ const saveForecastFunction = new sst.aws.Function('SaveForecastFn', {
   link: [forecastsTable],
   timeout: '30 seconds',
   memory: '256 MB',
+  permissions: xrayPermissions,
+  transform: xrayTransform,
 });
 
 // ── Bedrock InvokeModel permissions ──────────────────────────────────────────
@@ -178,6 +233,51 @@ new aws.iam.RolePolicy('StepFunctionsInvokePolicy', {
           agent3ImageGenFunction.arn,
           saveForecastFunction.arn,
         ],
+      },
+    ],
+  }),
+});
+
+// Allow Step Functions to send X-Ray trace segments (required when tracingConfiguration.enabled = true)
+new aws.iam.RolePolicy('StepFunctionsXRayPolicy', {
+  role: sfRole.id,
+  policy: JSON.stringify({
+    Version: '2012-10-17',
+    Statement: [
+      {
+        Effect: 'Allow',
+        Action: [
+          'xray:PutTraceSegments',
+          'xray:PutTelemetryRecords',
+          'xray:GetSamplingRules',
+          'xray:GetSamplingTargets',
+        ],
+        Resource: '*',
+      },
+    ],
+  }),
+});
+
+// Allow Step Functions to write execution logs to CloudWatch
+new aws.iam.RolePolicy('StepFunctionsLogsPolicy', {
+  role: sfRole.id,
+  policy: JSON.stringify({
+    Version: '2012-10-17',
+    Statement: [
+      {
+        Effect: 'Allow',
+        Action: [
+          'logs:CreateLogDelivery',
+          'logs:GetLogDelivery',
+          'logs:UpdateLogDelivery',
+          'logs:DeleteLogDelivery',
+          'logs:ListLogDeliveries',
+          'logs:PutLogEvents',
+          'logs:PutResourcePolicy',
+          'logs:DescribeResourcePolicies',
+          'logs:DescribeLogGroups',
+        ],
+        Resource: '*',
       },
     ],
   }),
@@ -466,7 +566,10 @@ export const forecastPipeline = new aws.sfn.StateMachine('ForecastPipeline', {
   roleArn: sfRole.arn,
   definition: smDefinition,
   type: 'STANDARD',
-  // Full logging added in Phase 5 (requires a CloudWatch log group destination)
+  // Phase 5: Active X-Ray tracing — propagates traces from API GW through SFN into Lambda
+  tracingConfiguration: { enabled: true },
+  // SFN CloudWatch log delivery is configured separately via the AWS console or CLI
+  // (the log group is provisioned above; connect it there to avoid Pulumi schema drift).
   loggingConfiguration: { level: 'OFF' },
 });
 
@@ -483,7 +586,9 @@ export const orchestratorFunction = new sst.aws.Function('OrchestratorFn', {
       actions: ['states:StartExecution'],
       resources: [forecastPipeline.arn],
     },
+    ...xrayPermissions,
   ],
   timeout: '30 seconds',
   memory: '256 MB',
+  transform: xrayTransform,
 });

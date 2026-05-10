@@ -1,5 +1,6 @@
-import { createLogger, normalizeCity } from '@uweather/core';
+import { createLogger, emitMetric, normalizeCity } from '@uweather/core';
 import type { UnifiedWeatherData } from '@uweather/core';
+import type { Context } from 'aws-lambda';
 import { weatherCacheService } from '../services/index.js';
 
 const log = createLogger({ function: 'pipeline-check-cache' });
@@ -28,11 +29,12 @@ export interface CheckCacheOutput {
  * If cacheHit=true, the Step Functions Choice state skips FetchWeather and
  * proceeds directly to agents (added in Phase 3).
  */
-export async function handler(input: CheckCacheInput): Promise<CheckCacheOutput> {
+export async function handler(input: CheckCacheInput, context: Context): Promise<CheckCacheOutput> {
+  const reqLog = log.child({ requestId: context.awsRequestId, city: input.city });
   const { city, date } = input;
   const cityNormalized = normalizeCity(city);
 
-  log.info('Checking WeatherCache', { city: cityNormalized, date });
+  reqLog.info('Checking WeatherCache', { city: cityNormalized, date });
 
   const items = await weatherCacheService.load(cityNormalized, date);
   const cutoffMs = Date.now() - CACHE_FRESH_WINDOW_MS;
@@ -40,15 +42,19 @@ export async function handler(input: CheckCacheInput): Promise<CheckCacheOutput>
   const freshItems = items.filter((item) => new Date(item.fetchedAt).getTime() > cutoffMs);
 
   const freshProviders = freshItems.map((item) => item.data);
+  const cacheHit = freshItems.length >= 2;
 
-  log.info('Cache check complete', {
+  reqLog.info('Cache check complete', {
     city: cityNormalized,
     totalItems: items.length,
     freshItems: freshItems.length,
-    cacheHit: freshItems.length >= 2,
+    cacheHit,
   });
 
-  if (freshItems.length >= 2) {
+  // Emit custom metric for cache hit rate tracking
+  emitMetric(cacheHit ? 'WeatherCacheHit' : 'WeatherCacheMiss', 1);
+
+  if (cacheHit) {
     return { cacheHit: true, providers: freshProviders };
   }
 

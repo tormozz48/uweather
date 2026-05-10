@@ -21,7 +21,8 @@ function parseLimit(raw: string | undefined): number {
  *   userId  — required
  *   limit   — optional, 1–50, default 10
  */
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
+  const reqLog = log.child({ requestId: context.awsRequestId });
   const params = event.queryStringParameters ?? {};
   const userId = params.userId?.trim();
 
@@ -31,16 +32,16 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
 
   const limit = parseLimit(params.limit);
 
-  log.info('History request', { userId, limit });
+  reqLog.info('History request', { userId, limit });
 
   try {
     const forecasts = (await forecastService.listByUser(userId, limit)).map(toForecastResponse);
 
-    log.info('History delivered', { userId, count: forecasts.length });
+    reqLog.info('History delivered', { userId, count: forecasts.length });
 
     return jsonOk({ userId, forecasts });
   } catch (err) {
-    log.error('History error', { userId, err });
+    reqLog.error('History error', { userId, error: (err as Error).message });
     return jsonServerError(
       500,
       'Failed to fetch history',

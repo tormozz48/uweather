@@ -46,7 +46,12 @@ export class WeatherCacheService {
   /**
    * Save a provider's weather data with a 30-minute TTL.
    */
-  async save<P extends WeatherProvider>({ city, date, provider, data }: SaveCacheInput<P>): Promise<void> {
+  async save<P extends WeatherProvider>({
+    city,
+    date,
+    provider,
+    data,
+  }: SaveCacheInput<P>): Promise<void> {
     const ttl = Math.floor(Date.now() / 1000) + CACHE_TTL_SECONDS;
     await dynamo.send(
       new PutCommand({

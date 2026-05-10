@@ -1,5 +1,5 @@
-export { createLogger, logger } from './logger.js';
-export type { LogLevel, LogContext } from './logger.js';
+export { createLogger, logger, emitMetric } from './logger.js';
+export type { LogLevel, LogContext, MetricUnit } from './logger.js';
 
 export { normalizeCity } from './city.js';
 

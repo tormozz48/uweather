@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto';
 import { SFNClient, StartExecutionCommand } from '@aws-sdk/client-sfn';
 import { createLogger, getCurrentTimeSlot, normalizeCity, toDateString } from '@uweather/core';
 import type { UnifiedWeatherData } from '@uweather/core';
+import type { Context } from 'aws-lambda';
 import { weatherCacheService } from './services/index.js';
 
 const sfn = new SFNClient({});
@@ -26,13 +27,18 @@ export interface OrchestratorInput {
   language?: string;
   /** Telegram chatId or web sessionId — defaults to 'anonymous' until Phase 4 */
   userId?: string;
+  /** Propagated from calling Lambda context for end-to-end correlation */
+  correlationId?: string;
 }
 
 export type OrchestratorOutput =
   | { cacheHit: true; providers: UnifiedWeatherData[] }
   | { cacheHit: false; executionArn: string };
 
-export async function handler(input: OrchestratorInput): Promise<OrchestratorOutput> {
+export async function handler(
+  input: OrchestratorInput,
+  context?: Context,
+): Promise<OrchestratorOutput> {
   const city = input.city?.trim();
   if (!city) throw new Error('city is required');
 
@@ -42,7 +48,11 @@ export async function handler(input: OrchestratorInput): Promise<OrchestratorOut
   const date = toDateString();
   const timeSlot = getCurrentTimeSlot();
 
-  log.info('Orchestrator invoked', { city: cityNormalized, language });
+  // Support both Lambda context requestId and explicit correlationId from callers
+  const requestId = context?.awsRequestId ?? input.correlationId;
+  const reqLog = log.child({ requestId, city: cityNormalized, language });
+
+  reqLog.info('Orchestrator invoked', { userId });
 
   // ── 1. Check WeatherCache ───────────────────────────────────────────────────
   const items = await weatherCacheService.load(cityNormalized, date);
@@ -50,8 +60,7 @@ export async function handler(input: OrchestratorInput): Promise<OrchestratorOut
   const freshItems = items.filter((item) => new Date(item.fetchedAt).getTime() > cutoffMs);
 
   if (freshItems.length >= 2) {
-    log.info('Cache hit — skipping Step Functions', {
-      city: cityNormalized,
+    reqLog.info('Cache hit — skipping Step Functions', {
       freshProviders: freshItems.length,
     });
     return {
@@ -61,8 +70,7 @@ export async function handler(input: OrchestratorInput): Promise<OrchestratorOut
   }
 
   // ── 2. Cache miss — start Step Functions execution ─────────────────────────
-  log.info('Cache miss — starting Step Functions execution', {
-    city: cityNormalized,
+  reqLog.info('Cache miss — starting Step Functions execution', {
     staleItems: freshItems.length,
   });
 
@@ -80,8 +88,7 @@ export async function handler(input: OrchestratorInput): Promise<OrchestratorOut
     }),
   );
 
-  log.info('Step Functions execution started', {
-    city: cityNormalized,
+  reqLog.info('Step Functions execution started', {
     executionArn: execution.executionArn,
     executionName,
   });

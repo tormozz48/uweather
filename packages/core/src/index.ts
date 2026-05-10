@@ -18,6 +18,7 @@ export type {
 export {
   createLogger,
   logger,
+  emitMetric,
   normalizeCity,
   getTimeSlot,
   getCurrentTimeSlot,
@@ -30,6 +31,7 @@ export {
 export type {
   LogLevel,
   LogContext,
+  MetricUnit,
   TimeSlot,
   TempBucket,
   ImageCacheKeyParams,

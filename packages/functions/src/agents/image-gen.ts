@@ -4,8 +4,10 @@ import {
   buildImageGenPrompt,
   buildS3ImageKey,
   createLogger,
+  emitMetric,
 } from '@uweather/core';
 import type { ConsensusForecast, TimeSlot } from '@uweather/core';
+import type { Context } from 'aws-lambda';
 import { Resource } from 'sst';
 
 const s3 = new S3Client({});
@@ -105,12 +107,16 @@ async function uploadToS3(
  * Endpoint: POST https://gateway.pixazo.ai/getImage/v1/getSDXLImage
  * Auth header: Ocp-Apim-Subscription-Key
  */
-export async function handler(input: ImageGenInput): Promise<ImageGenOutput> {
-  log.info('Agent3_ImageGen starting', {
+export async function handler(input: ImageGenInput, context: Context): Promise<ImageGenOutput> {
+  const reqLog = log.child({
+    requestId: context.awsRequestId,
     city: input.city,
+    imageCacheKey: input.imageCacheKey,
+  });
+
+  reqLog.info('Agent3_ImageGen starting', {
     timeSlot: input.timeSlot,
     condition: input.consensus.condition,
-    imageCacheKey: input.imageCacheKey,
   });
 
   const prompt = buildImageGenPrompt({
@@ -120,26 +126,24 @@ export async function handler(input: ImageGenInput): Promise<ImageGenOutput> {
   });
   const negativePrompt = buildImageGenNegativePrompt();
 
-  const pixazoImageUrl = await log.timed('Pixazo SDXL - image-gen', () =>
+  const pixazoImageUrl = await reqLog.timed('Pixazo SDXL - image-gen', () =>
     generateImageWithPixazo(prompt, negativePrompt),
   );
-  log.info('Pixazo image URL received', { pixazoImageUrl });
+  reqLog.info('Pixazo image URL received', { pixazoImageUrl });
 
-  const { imageBuffer, contentType } = await log.timed('Download image from Pixazo CDN', () =>
+  const { imageBuffer, contentType } = await reqLog.timed('Download image from Pixazo CDN', () =>
     downloadImage(pixazoImageUrl),
   );
 
   const s3Key = buildS3ImageKey(input.imageCacheKey);
-  const imageUrl = await log.timed('S3 PutObject - image upload', () =>
+  const imageUrl = await reqLog.timed('S3 PutObject - image upload', () =>
     uploadToS3(s3Key, imageBuffer, contentType),
   );
 
-  log.info('Image generated and uploaded', {
-    city: input.city,
-    imageCacheKey: input.imageCacheKey,
-    s3Key,
-    imageUrl,
-  });
+  reqLog.info('Image generated and uploaded', { s3Key, imageUrl });
+
+  // Track image generation count for cost monitoring
+  emitMetric('ImageGenerationCount', 1);
 
   return { imageUrl, imageCacheKey: input.imageCacheKey };
 }

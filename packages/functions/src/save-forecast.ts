@@ -11,6 +11,7 @@
  */
 import { createLogger } from '@uweather/core';
 import type { ConsensusForecast, TimeSlot } from '@uweather/core';
+import type { Context } from 'aws-lambda';
 import { forecastService } from './services/index.js';
 
 const log = createLogger({ function: 'save-forecast' });
@@ -35,13 +36,21 @@ export interface SaveForecastOutput {
   date: string;
 }
 
-export async function handler(input: SaveForecastInput): Promise<SaveForecastOutput> {
-  log.info('Saving forecast', {
+export async function handler(
+  input: SaveForecastInput,
+  context: Context,
+): Promise<SaveForecastOutput> {
+  const reqLog = log.child({
+    requestId: context.awsRequestId,
     city: input.city,
-    language: input.language,
     userId: input.userId,
+  });
+
+  reqLog.info('Saving forecast', {
+    language: input.language,
     timeSlot: input.timeSlot,
     imageCacheKey: input.imageCacheKey,
+    sourcesUsed: input.sourcesUsed,
   });
 
   const forecastId = await forecastService.save({
@@ -58,7 +67,7 @@ export async function handler(input: SaveForecastInput): Promise<SaveForecastOut
     sourcesUsed: input.sourcesUsed,
   });
 
-  log.info('Forecast saved', { forecastId, city: input.city });
+  reqLog.info('Forecast saved', { forecastId });
 
   return {
     forecastId,

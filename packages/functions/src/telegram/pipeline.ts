@@ -104,9 +104,6 @@ export async function runPipeline(
  * Return the last `limit` forecasts for a Telegram user, newest-first.
  * Queries the UserHistoryIndex GSI on the Forecasts table.
  */
-export function fetchForecastHistory(
-  userId: string,
-  limit: number,
-): Promise<ForecastResult[]> {
+export function fetchForecastHistory(userId: string, limit: number): Promise<ForecastResult[]> {
   return forecastService.listByUser(userId, limit);
 }

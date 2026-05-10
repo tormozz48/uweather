@@ -1,5 +1,6 @@
-import { createLogger, normalizeCity } from '@uweather/core';
+import { createLogger, emitMetric, normalizeCity } from '@uweather/core';
 import type { ProviderInput, ProviderOutput } from '@uweather/core';
+import type { Context } from 'aws-lambda';
 import { weatherCacheService } from '../services/index.js';
 import { fetchOpenMeteo } from './open-meteo.client.js';
 
@@ -16,15 +17,26 @@ const log = createLogger({ function: `provider-${PROVIDER_NAME}` });
  *
  * Throws on any failure so Step Functions retry/catch logic engages.
  */
-export async function handler(input: ProviderInput): Promise<ProviderOutput<typeof PROVIDER_NAME>> {
+export async function handler(
+  input: ProviderInput,
+  context: Context,
+): Promise<ProviderOutput<typeof PROVIDER_NAME>> {
   const { city, date } = input;
-  log.info('Fetching weather from Open-Meteo', { city });
+  const reqLog = log.child({ requestId: context.awsRequestId, city, provider: PROVIDER_NAME });
+  reqLog.info('Fetching weather from Open-Meteo');
 
-  const data = await fetchOpenMeteo(city);
+  try {
+    const data = await fetchOpenMeteo(city);
 
-  const cityNormalized = normalizeCity(city);
-  await weatherCacheService.save({ city: cityNormalized, date, provider: PROVIDER_NAME, data });
+    const cityNormalized = normalizeCity(city);
+    await weatherCacheService.save({ city: cityNormalized, date, provider: PROVIDER_NAME, data });
 
-  log.info('Weather cached', { city: cityNormalized, provider: PROVIDER_NAME, date });
-  return { provider: PROVIDER_NAME, success: true, data };
+    reqLog.info('Weather cached', { city: cityNormalized, date });
+    emitMetric('ProviderSuccess', 1, 'Count', { provider: PROVIDER_NAME });
+    return { provider: PROVIDER_NAME, success: true, data };
+  } catch (err) {
+    reqLog.error('Provider fetch failed', { error: (err as Error).message });
+    emitMetric('ProviderError', 1, 'Count', { provider: PROVIDER_NAME });
+    throw err;
+  }
 }

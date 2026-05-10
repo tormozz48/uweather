@@ -1,4 +1,5 @@
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
+export type MetricUnit = 'Count' | 'Milliseconds' | 'Seconds' | 'Bytes' | 'Percent' | 'None';
 
 export interface LogContext {
   service?: string;
@@ -18,6 +19,47 @@ interface LogEntry extends LogContext {
 }
 
 const SERVICE_NAME = 'uweather';
+
+/**
+ * Emit a CloudWatch metric using the Embedded Metrics Format (EMF).
+ *
+ * Lambda + CloudWatch Logs automatically parses EMF lines and publishes
+ * them as CloudWatch custom metrics — no PutMetricData API call needed.
+ *
+ * Namespace: `uweather/{stage}` (from SST_STAGE env var, falls back to "dev").
+ * Dimensions: `{ service: "uweather", ...dimensions }`.
+ *
+ * @param name    Metric name, e.g. "WeatherCacheHit"
+ * @param value   Numeric value
+ * @param unit    CloudWatch unit (default "Count")
+ * @param dimensions  Additional dimension key/value pairs (e.g. { provider: "openweather" })
+ */
+export function emitMetric(
+  name: string,
+  value: number,
+  unit: MetricUnit = 'Count',
+  dimensions: Record<string, string> = {},
+): void {
+  const namespace = `uweather/${process.env.SST_STAGE ?? 'dev'}`;
+  const allDimensions = { service: SERVICE_NAME, ...dimensions };
+  const dimensionKeys = Object.keys(allDimensions);
+
+  const entry: Record<string, unknown> = {
+    _aws: {
+      Timestamp: Date.now(),
+      CloudWatchMetrics: [
+        {
+          Namespace: namespace,
+          Dimensions: [dimensionKeys],
+          Metrics: [{ Name: name, Unit: unit }],
+        },
+      ],
+    },
+    ...allDimensions,
+    [name]: value,
+  };
+  process.stdout.write(`${JSON.stringify(entry)}\n`);
+}
 
 function emit(level: LogLevel, message: string, context: LogContext): void {
   const entry: LogEntry = {
@@ -64,6 +106,18 @@ export function createLogger(baseContext: LogContext = {}) {
         });
         throw err;
       }
+    },
+    /**
+     * Emit a CloudWatch custom metric via EMF.
+     * Convenience wrapper around the standalone `emitMetric()`.
+     */
+    metric(
+      name: string,
+      value: number,
+      unit?: MetricUnit,
+      dimensions?: Record<string, string>,
+    ): void {
+      emitMetric(name, value, unit, dimensions);
     },
     /** Return a child logger with additional context merged in */
     child(childContext: LogContext) {

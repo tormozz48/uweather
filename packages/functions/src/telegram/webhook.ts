@@ -28,14 +28,16 @@ registerCommands(bot);
 const handleUpdate = webhookCallback(bot, 'aws-lambda-async');
 
 export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
-  log.info('Telegram update received');
+  const reqLog = log.child({ requestId: context.awsRequestId });
+  reqLog.info('Telegram update received');
   try {
     await handleUpdate(event, context);
   } catch (err) {
-    log.error('Webhook handler error', { err });
+    // Log but never propagate — returning non-200 would cause Telegram to retry indefinitely
+    reqLog.error('Webhook handler error', { error: (err as Error).message });
   }
   // Always return 200 — grammY's aws-lambda-async calls the Lambda callback
   // synchronously (API Gateway gets the 200 immediately) and runs the bot handler
-  // asynchronously. A non-2xx return would cause Telegram to retry indefinitely.
+  // asynchronously.
   return { statusCode: 200, body: 'ok' };
 };

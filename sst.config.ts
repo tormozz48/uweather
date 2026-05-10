@@ -33,12 +33,14 @@ export default $config({
     await import('./infra/pipeline.ts'); // Secrets, Lambdas, Step Functions
     await import('./infra/api.ts'); // API Gateway + route Lambdas (Phase 4)
     await import('./infra/web.ts'); // Vite SPA StaticSite (Phase 4)
-    // await import('./infra/monitoring'); // Phase 5
+    const { alarmSnsTopic } = await import('./infra/monitoring.ts'); // Phase 5
 
     return {
       // Copy this ARN into defaultTags.awsApplication and redeploy
       // to make all resources appear in AWS Console → My Applications
       AppRegistryApplicationArn: applicationArn,
+      // Phase 5: subscribe to this topic in AWS Console to receive alarm emails
+      AlarmSnsTopicArn: alarmSnsTopic.arn,
     };
   },
 });

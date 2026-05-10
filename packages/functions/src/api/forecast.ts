@@ -34,12 +34,17 @@ interface PipelineOutput {
  *  - Cache hit   → weather data is fresh but Step Functions wasn't started;
  *                  start it here so the AI agents can run against the cached data.
  */
-async function startPipeline(city: string, language: string, userId: string): Promise<string> {
+async function startPipeline(
+  city: string,
+  language: string,
+  userId: string,
+  correlationId: string,
+): Promise<string> {
   const cityNormalized = normalizeCity(city);
   const date = toDateString();
   const timeSlot = getCurrentTimeSlot();
 
-  const result = await orchestratorHandler({ city, language, userId });
+  const result = await orchestratorHandler({ city, language, userId, correlationId });
 
   if (!result.cacheHit) {
     return result.executionArn;
@@ -107,7 +112,10 @@ async function pollExecution(executionArn: string, timeoutMs = 85_000): Promise<
  * the client may receive a 504 before Lambda finishes — the forecast is still
  * stored in DynamoDB and available via /history on the next request.
  */
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
+  const requestId = context.awsRequestId;
+  const reqLog = log.child({ requestId });
+
   const params = event.queryStringParameters ?? {};
   const city = params.city?.trim();
   const language = params.lang?.trim() ?? 'en';
@@ -117,18 +125,18 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     return jsonBadRequest('city query parameter is required');
   }
 
-  log.info('Forecast request', { city, language, userId });
+  reqLog.info('Forecast request', { city, language, userId });
 
   try {
-    const executionArn = await startPipeline(city, language, userId);
+    const executionArn = await startPipeline(city, language, userId, requestId);
     const { forecastId } = await pollExecution(executionArn);
     const forecast = await fetchForecastById(forecastId);
 
-    log.info('Forecast delivered', { forecastId: forecast.forecastId, city: forecast.city });
+    reqLog.info('Forecast delivered', { forecastId: forecast.forecastId, city: forecast.city });
 
     return jsonOk(toForecastResponse(forecast));
   } catch (err) {
-    log.error('Forecast error', { city, err });
+    reqLog.error('Forecast error', { city, error: (err as Error).message });
 
     const isTimeout = err instanceof Error && err.message.includes('timed out');
     return jsonServerError(

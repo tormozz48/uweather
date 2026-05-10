@@ -1,6 +1,7 @@
 import { forecastPipeline, telegramBotToken } from './pipeline.ts';
 /**
  * infra/api.ts — Phase 4: API Gateway routes + Lambda bindings
+ *                Phase 5 updates: X-Ray tracing on all route Lambdas
  *
  * Routes:
  *   GET  /health              — liveness check
@@ -12,6 +13,29 @@ import { forecastPipeline, telegramBotToken } from './pipeline.ts';
  * because api.ts depends on forecastPipeline and telegramBotToken.
  */
 import { forecastsTable, usersTable, weatherCacheTable } from './storage.ts';
+
+// ── Shared X-Ray config ───────────────────────────────────────────────────────
+//
+// All route Lambdas get active X-Ray tracing so traces propagate from API
+// Gateway through Lambda into Step Functions (enabled on SFN in pipeline.ts).
+
+const xrayTransform: sst.aws.FunctionArgs['transform'] = {
+  function: (args) => {
+    args.tracingConfig = { mode: 'Active' };
+  },
+};
+
+const xrayPermissions = [
+  {
+    actions: [
+      'xray:PutTraceSegments',
+      'xray:PutTelemetryRecords',
+      'xray:GetSamplingRules',
+      'xray:GetSamplingTargets',
+    ],
+    resources: ['*' as const],
+  },
+];
 
 /**
  * API Gateway HTTP API.
@@ -48,6 +72,8 @@ const sfnPermissions = [
 
 api.route('GET /health', {
   handler: 'packages/functions/src/api/health.handler',
+  permissions: xrayPermissions,
+  transform: xrayTransform,
 });
 
 // ── GET /forecast ─────────────────────────────────────────────────────────────
@@ -64,9 +90,10 @@ api.route('GET /forecast', {
   environment: {
     STATE_MACHINE_ARN: forecastPipeline.arn,
   },
-  permissions: sfnPermissions,
+  permissions: [...sfnPermissions, ...xrayPermissions],
   timeout: '120 seconds',
   memory: '256 MB',
+  transform: xrayTransform,
 });
 
 // ── GET /history ──────────────────────────────────────────────────────────────
@@ -76,6 +103,8 @@ api.route('GET /history', {
   link: [forecastsTable],
   timeout: '15 seconds',
   memory: '256 MB',
+  permissions: xrayPermissions,
+  transform: xrayTransform,
 });
 
 // ── POST /telegram/webhook ────────────────────────────────────────────────────
@@ -90,7 +119,8 @@ api.route('POST /telegram/webhook', {
   environment: {
     STATE_MACHINE_ARN: forecastPipeline.arn,
   },
-  permissions: sfnPermissions,
+  permissions: [...sfnPermissions, ...xrayPermissions],
   timeout: '120 seconds',
   memory: '512 MB',
+  transform: xrayTransform,
 });

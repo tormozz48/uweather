@@ -1,6 +1,7 @@
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
-import { buildFunnyTextPrompt, createLogger } from '@uweather/core';
+import { buildFunnyTextPrompt, createLogger, emitMetric } from '@uweather/core';
 import type { ConsensusForecast } from '@uweather/core';
+import type { Context } from 'aws-lambda';
 import { forecastService } from '../services/index.js';
 
 const bedrock = new BedrockRuntimeClient({});
@@ -25,15 +26,20 @@ export interface FunnyTextOutput {
  *
  * Step Functions task: invoked after Agent 1 (compare). Takes the
  * ConsensusForecast, queries recent forecast history for this city to avoid
- * repetition, then calls Bedrock Claude 3.5 Haiku to generate a 2–3 paragraph
+ * repetition, then calls Bedrock Claude Haiku to generate a 2–3 paragraph
  * humorous weather report in the requested language.
  */
-export async function handler(input: FunnyTextInput): Promise<FunnyTextOutput> {
-  log.info('Agent2_FunnyText starting', { city: input.city, language: input.language });
+export async function handler(input: FunnyTextInput, context: Context): Promise<FunnyTextOutput> {
+  const reqLog = log.child({
+    requestId: context.awsRequestId,
+    city: input.city,
+    language: input.language,
+  });
+  reqLog.info('Agent2_FunnyText starting');
 
   // Fetch recent history for this city to avoid repetition
-  const recentHistory = await fetchRecentHistory(input.city, input.language);
-  log.info('Fetched recent history', { city: input.city, count: recentHistory.length });
+  const recentHistory = await fetchRecentHistory(input.city, input.language, reqLog);
+  reqLog.info('Fetched recent history', { count: recentHistory.length });
 
   const { system, user } = buildFunnyTextPrompt({
     consensus: input.consensus,
@@ -42,8 +48,13 @@ export async function handler(input: FunnyTextInput): Promise<FunnyTextOutput> {
     recentHistory,
   });
 
-  const bedrockResponse = await log.timed('Bedrock Haiku - funny-text', () =>
-    bedrock.send(
+  // Track Bedrock latency manually so we can emit the metric regardless of success/failure
+  const bedrockStart = Date.now();
+  let bedrockDurationMs = 0;
+
+  let funnyText: string;
+  try {
+    const response = await bedrock.send(
       new InvokeModelCommand({
         modelId: MODEL_ID,
         contentType: 'application/json',
@@ -55,24 +66,41 @@ export async function handler(input: FunnyTextInput): Promise<FunnyTextOutput> {
           messages: [{ role: 'user', content: user }],
         }),
       }),
-    ),
-  );
+    );
 
-  const responseBody = JSON.parse(
-    new TextDecoder().decode((bedrockResponse as { body: Uint8Array }).body),
-  ) as { content: Array<{ type: string; text: string }> };
+    bedrockDurationMs = Date.now() - bedrockStart;
+    emitMetric('BedrockLatency', bedrockDurationMs, 'Milliseconds', { agent: 'funny-text' });
+    reqLog.info('Bedrock Haiku - funny-text', { duration_ms: bedrockDurationMs });
 
-  const funnyText = responseBody.content.find((c) => c.type === 'text')?.text?.trim() ?? '';
+    const responseBody = JSON.parse(new TextDecoder().decode(response.body)) as {
+      content: Array<{ type: string; text: string }>;
+    };
+    funnyText = responseBody.content.find((c) => c.type === 'text')?.text?.trim() ?? '';
+  } catch (err) {
+    bedrockDurationMs = Date.now() - bedrockStart;
+    const isThrottle =
+      err instanceof Error &&
+      (err.name === 'ThrottlingException' || err.message.includes('throttl'));
+    if (isThrottle) {
+      reqLog.warn('Bedrock throttled on funny-text agent', {
+        duration_ms: bedrockDurationMs,
+        error: (err as Error).message,
+      });
+      emitMetric('BedrockThrottled', 1, 'Count', { agent: 'funny-text' });
+    } else {
+      reqLog.error('Bedrock invocation failed on funny-text agent', {
+        duration_ms: bedrockDurationMs,
+        error: (err as Error).message,
+      });
+    }
+    throw err;
+  }
 
   if (!funnyText) {
     throw new Error('Agent2_FunnyText: Bedrock returned empty text');
   }
 
-  log.info('Funny text generated', {
-    city: input.city,
-    language: input.language,
-    length: funnyText.length,
-  });
+  reqLog.info('Funny text generated', { length: funnyText.length, bedrockDurationMs });
 
   return { funnyText };
 }
@@ -80,19 +108,17 @@ export async function handler(input: FunnyTextInput): Promise<FunnyTextOutput> {
 /**
  * Query the last N funny texts for this city+language from the Forecasts table
  * via the UserHistoryIndex GSI.
- *
- * Using a simple scan of recent items by imageCacheKey prefix is not ideal —
- * a dedicated GSI for city+language would be cleaner. For now we use the
- * UserHistoryIndex with userId='system' as a city-level history bucket.
- * Phase 4 can refine this once real userId data flows through.
  */
-async function fetchRecentHistory(city: string, language: string): Promise<string[]> {
+async function fetchRecentHistory(
+  city: string,
+  language: string,
+  reqLog: ReturnType<ReturnType<typeof createLogger>['child']>,
+): Promise<string[]> {
   try {
     return await forecastService.listRecentFunnyTexts(city, language, MAX_HISTORY_ITEMS);
   } catch (err) {
     // History is best-effort — don't fail the pipeline if it can't be fetched
-    log.warn('Failed to fetch recent history (non-fatal)', {
-      city,
+    reqLog.warn('Failed to fetch recent history (non-fatal)', {
       error: err instanceof Error ? err.message : String(err),
     });
     return [];

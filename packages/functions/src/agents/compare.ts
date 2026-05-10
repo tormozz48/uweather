@@ -1,6 +1,7 @@
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
-import { buildComparePrompt, createLogger } from '@uweather/core';
+import { buildComparePrompt, createLogger, emitMetric } from '@uweather/core';
 import type { ConsensusForecast, UnifiedWeatherData } from '@uweather/core';
+import type { Context } from 'aws-lambda';
 
 const bedrock = new BedrockRuntimeClient({});
 const log = createLogger({ function: 'agent-compare' });
@@ -28,17 +29,16 @@ export interface CompareOutput {
  * Agent 1 — Weather Comparison Lambda.
  *
  * Step Functions task: invoked after FetchWeather (fresh fetch) or directly
- * after a cache hit. Accepts raw provider results, calls Bedrock Claude 3.5
- * Haiku to produce a single ConsensusForecast, and returns it along with the
+ * after a cache hit. Accepts raw provider results, calls Bedrock Claude Haiku
+ * to produce a single ConsensusForecast, and returns it along with the
  * list of providers whose data contributed.
  *
- * Input shape accepts both:
- *   - Wrapped provider output: { success: boolean; provider: string; data?: UnifiedWeatherData }
- *     (produced by the Parallel FetchWeather branches)
- *   - Direct UnifiedWeatherData array (produced by the cache-hit path)
+ * Hardening: proceeds with as few as 1 provider (low confidence), but logs a
+ * warning so operators can track degraded-mode forecasts via CloudWatch.
  */
-export async function handler(input: CompareInput): Promise<CompareOutput> {
-  log.info('Agent1_Compare starting', { city: input.city, date: input.date });
+export async function handler(input: CompareInput, context: Context): Promise<CompareOutput> {
+  const reqLog = log.child({ requestId: context.awsRequestId, city: input.city });
+  reqLog.info('Agent1_Compare starting', { date: input.date });
 
   // Normalise — accept both wrapped { success, data } objects and bare UnifiedWeatherData
   const weatherDataArray: UnifiedWeatherData[] = input.providerResults
@@ -59,6 +59,8 @@ export async function handler(input: CompareInput): Promise<CompareOutput> {
     );
 
   if (weatherDataArray.length === 0) {
+    reqLog.error('No successful provider data — cannot produce consensus');
+    emitMetric('ProviderCount', 0);
     throw new Error(`Agent1_Compare: no successful provider data for ${input.city}`);
   }
 
@@ -68,12 +70,26 @@ export async function handler(input: CompareInput): Promise<CompareOutput> {
     | 'open-meteo'
   )[];
 
-  log.info('Comparing weather data', { city: input.city, providers: sourcesUsed });
+  // Graceful degradation: 1 provider means low confidence — track it
+  emitMetric('ProviderCount', weatherDataArray.length);
+  if (weatherDataArray.length === 1) {
+    reqLog.warn('Only one provider available — producing low-confidence consensus', {
+      provider: sourcesUsed[0],
+    });
+    emitMetric('LowConfidenceForecast', 1);
+  }
+
+  reqLog.info('Comparing weather data', { providers: sourcesUsed });
 
   const { system, user } = buildComparePrompt({ providers: weatherDataArray });
 
-  const bedrockResponse = await log.timed('Bedrock Haiku - compare', () =>
-    bedrock.send(
+  // Track Bedrock latency manually so we can emit the metric regardless of success/failure
+  const bedrockStart = Date.now();
+  let bedrockDurationMs = 0;
+
+  let rawText: string;
+  try {
+    const response = await bedrock.send(
       new InvokeModelCommand({
         modelId: MODEL_ID,
         contentType: 'application/json',
@@ -85,14 +101,35 @@ export async function handler(input: CompareInput): Promise<CompareOutput> {
           messages: [{ role: 'user', content: user }],
         }),
       }),
-    ),
-  );
+    );
 
-  const responseBody = JSON.parse(
-    new TextDecoder().decode((bedrockResponse as { body: Uint8Array }).body),
-  ) as { content: Array<{ type: string; text: string }> };
+    bedrockDurationMs = Date.now() - bedrockStart;
+    emitMetric('BedrockLatency', bedrockDurationMs, 'Milliseconds', { agent: 'compare' });
+    reqLog.info('Bedrock Haiku - compare', { duration_ms: bedrockDurationMs });
 
-  const rawText = responseBody.content.find((c) => c.type === 'text')?.text ?? '';
+    const responseBody = JSON.parse(new TextDecoder().decode(response.body)) as {
+      content: Array<{ type: string; text: string }>;
+    };
+    rawText = responseBody.content.find((c) => c.type === 'text')?.text ?? '';
+  } catch (err) {
+    bedrockDurationMs = Date.now() - bedrockStart;
+    const isThrottle =
+      err instanceof Error &&
+      (err.name === 'ThrottlingException' || err.message.includes('throttl'));
+    if (isThrottle) {
+      reqLog.warn('Bedrock throttled on compare agent', {
+        duration_ms: bedrockDurationMs,
+        error: (err as Error).message,
+      });
+      emitMetric('BedrockThrottled', 1, 'Count', { agent: 'compare' });
+    } else {
+      reqLog.error('Bedrock invocation failed on compare agent', {
+        duration_ms: bedrockDurationMs,
+        error: (err as Error).message,
+      });
+    }
+    throw err;
+  }
 
   // Strip accidental markdown fences before parsing
   const jsonText = rawText
@@ -104,16 +141,16 @@ export async function handler(input: CompareInput): Promise<CompareOutput> {
   try {
     consensus = JSON.parse(jsonText) as ConsensusForecast;
   } catch {
-    log.error('Failed to parse ConsensusForecast JSON', { excerpt: rawText.slice(0, 400) });
+    reqLog.error('Failed to parse ConsensusForecast JSON', { excerpt: rawText.slice(0, 400) });
     throw new Error('Agent1_Compare: Bedrock response was not valid JSON');
   }
 
-  log.info('Consensus forecast generated', {
-    city: input.city,
+  reqLog.info('Consensus forecast generated', {
     condition: consensus.condition,
     temperature: consensus.temperature,
     confidence: consensus.confidence,
     providerCount: sourcesUsed.length,
+    bedrockDurationMs,
   });
 
   return { consensus, sourcesUsed };
