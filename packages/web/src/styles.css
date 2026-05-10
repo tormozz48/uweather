@@ -1,6 +1,12 @@
 /* ── Reset & base ──────────────────────────────────────────────────────────── */
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 :root {
   --color-bg: #0f1117;
@@ -15,11 +21,13 @@
   --color-error-bg: #2d1515;
   --radius: 12px;
   --radius-sm: 8px;
-  --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --font: "Inter", system-ui, -apple-system, sans-serif;
   --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
-html { font-size: 16px; }
+html {
+  font-size: 16px;
+}
 
 body {
   font-family: var(--font);
@@ -99,9 +107,16 @@ body {
   transition: border-color 0.15s;
 }
 
-.search-form__input::placeholder { color: var(--color-text-muted); }
-.search-form__input:focus { border-color: var(--color-primary); }
-.search-form__input:disabled { opacity: 0.6; cursor: not-allowed; }
+.search-form__input::placeholder {
+  color: var(--color-text-muted);
+}
+.search-form__input:focus {
+  border-color: var(--color-primary);
+}
+.search-form__input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 
 .search-form__lang {
   padding: 12px 12px;
@@ -114,7 +129,10 @@ body {
   outline: none;
 }
 
-.search-form__lang:disabled { opacity: 0.6; cursor: not-allowed; }
+.search-form__lang:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 
 .search-form__button {
   width: 100%;
@@ -129,14 +147,23 @@ body {
   transition: background 0.15s, opacity 0.15s;
 }
 
-.search-form__button:hover:not(:disabled) { background: var(--color-primary-hover); }
-.search-form__button:disabled { opacity: 0.5; cursor: not-allowed; }
+.search-form__button:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+.search-form__button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* ── Skeleton loader ───────────────────────────────────────────────────────── */
 
 @keyframes shimmer {
-  0%   { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
 }
 
 .skeleton {
@@ -161,12 +188,26 @@ body {
   gap: 14px;
 }
 
-.skeleton--title  { height: 28px; width: 55%; }
-.skeleton--image  { height: 220px; border-radius: var(--radius-sm); }
-.skeleton--line   { height: 14px; }
-.skeleton--short  { width: 70%; }
+.skeleton--title {
+  height: 28px;
+  width: 55%;
+}
+.skeleton--image {
+  height: 220px;
+  border-radius: var(--radius-sm);
+}
+.skeleton--line {
+  height: 14px;
+}
+.skeleton--short {
+  width: 70%;
+}
 
-.loading-section { display: flex; flex-direction: column; gap: 12px; }
+.loading-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 
 .loading-section__hint {
   text-align: center;
@@ -188,7 +229,9 @@ body {
   gap: 12px;
 }
 
-.error-card__icon { font-size: 2rem; }
+.error-card__icon {
+  font-size: 2rem;
+}
 
 .error-card__message {
   color: var(--color-error);
@@ -206,7 +249,9 @@ body {
   transition: background 0.15s;
 }
 
-.error-card__retry:hover { background: rgba(248, 113, 113, 0.1); }
+.error-card__retry:hover {
+  background: rgba(248, 113, 113, 0.1);
+}
 
 /* ── Forecast section ──────────────────────────────────────────────────────── */
 
@@ -218,8 +263,14 @@ body {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .forecast-image {
@@ -246,7 +297,9 @@ body {
   margin-bottom: 16px;
 }
 
-.weather-card__emoji { font-size: 2.4rem; }
+.weather-card__emoji {
+  font-size: 2.4rem;
+}
 
 .weather-card__city {
   font-size: 1.4rem;
@@ -297,9 +350,15 @@ body {
   font-size: 0.82rem;
 }
 
-.stat__icon { font-size: 0.95rem; }
-.stat__label { color: var(--color-text-muted); }
-.stat__value { font-weight: 600; }
+.stat__icon {
+  font-size: 0.95rem;
+}
+.stat__label {
+  color: var(--color-text-muted);
+}
+.stat__value {
+  font-weight: 600;
+}
 
 /* ── Funny text ────────────────────────────────────────────────────────────── */
 
@@ -316,8 +375,6 @@ body {
 }
 
 /* ── History ───────────────────────────────────────────────────────────────── */
-
-.history { }
 
 .history__title {
   font-size: 0.85rem;
@@ -352,7 +409,9 @@ body {
   background: var(--color-surface-2);
 }
 
-.history__emoji { font-size: 1.1rem; }
+.history__emoji {
+  font-size: 1.1rem;
+}
 
 .history__city {
   flex: 1;
@@ -385,10 +444,22 @@ body {
 /* ── Responsive ────────────────────────────────────────────────────────────── */
 
 @media (max-width: 480px) {
-  .app-header { padding: 32px 0 24px; }
-  .app-header__title { font-size: 1.6rem; }
-  .search-form__row { flex-direction: column; }
-  .weather-card__temp { font-size: 2rem; }
-  .weather-card__emoji { font-size: 1.8rem; }
-  .weather-card__city { font-size: 1.2rem; }
+  .app-header {
+    padding: 32px 0 24px;
+  }
+  .app-header__title {
+    font-size: 1.6rem;
+  }
+  .search-form__row {
+    flex-direction: column;
+  }
+  .weather-card__temp {
+    font-size: 2rem;
+  }
+  .weather-card__emoji {
+    font-size: 1.8rem;
+  }
+  .weather-card__city {
+    font-size: 1.2rem;
+  }
 }

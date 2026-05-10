@@ -1,3 +1,5 @@
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 /**
  * Global vitest setup — loads .env.test before any test file runs.
  *
@@ -6,8 +8,6 @@
  *   WEATHERAPI_KEY=...
  */
 import { config } from 'dotenv';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

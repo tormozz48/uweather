@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 /**
  * Orchestrator Lambda — entry point for the forecast pipeline.
  *
@@ -10,15 +11,11 @@
  * Invoked directly in Phase 2 (for testing). In Phase 4, the GET /forecast
  * Lambda handler will call this function.
  */
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { SFNClient, StartExecutionCommand } from '@aws-sdk/client-sfn';
-import { Resource } from 'sst';
-import { createLogger, normalizeCity, toDateString, getCurrentTimeSlot } from '@uweather/core';
-import type { UnifiedWeatherData, WeatherCacheEntry } from '@uweather/core';
-import { randomUUID } from 'node:crypto';
+import { createLogger, getCurrentTimeSlot, normalizeCity, toDateString } from '@uweather/core';
+import type { UnifiedWeatherData } from '@uweather/core';
+import { weatherCacheService } from './services/index.js';
 
-const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const sfn = new SFNClient({});
 const log = createLogger({ function: 'orchestrator' });
 
@@ -48,18 +45,7 @@ export async function handler(input: OrchestratorInput): Promise<OrchestratorOut
   log.info('Orchestrator invoked', { city: cityNormalized, language });
 
   // ── 1. Check WeatherCache ───────────────────────────────────────────────────
-  const cacheResult = await dynamo.send(
-    new QueryCommand({
-      TableName: Resource.WeatherCache.name,
-      KeyConditionExpression: 'pk = :pk AND begins_with(sk, :datePrefix)',
-      ExpressionAttributeValues: {
-        ':pk': `CACHE#${cityNormalized}`,
-        ':datePrefix': `${date}#`,
-      },
-    }),
-  );
-
-  const items = (cacheResult.Items ?? []) as WeatherCacheEntry[];
+  const items = await weatherCacheService.load(cityNormalized, date);
   const cutoffMs = Date.now() - CACHE_FRESH_WINDOW_MS;
   const freshItems = items.filter((item) => new Date(item.fetchedAt).getTime() > cutoffMs);
 
@@ -102,6 +88,6 @@ export async function handler(input: OrchestratorInput): Promise<OrchestratorOut
 
   return {
     cacheHit: false,
-    executionArn: execution.executionArn!,
+    executionArn: execution.executionArn ?? '',
   };
 }

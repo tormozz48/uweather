@@ -9,21 +9,27 @@ interface SearchFormProps {
   onSubmit: (e: React.FormEvent) => void;
 }
 
-export function SearchForm({ city, lang, isLoading, onCityChange, onLangChange, onSubmit }: SearchFormProps) {
+export function SearchForm({
+  city,
+  lang,
+  isLoading,
+  onCityChange,
+  onLangChange,
+  onSubmit,
+}: SearchFormProps) {
   return (
-    <form className="search-form" onSubmit={onSubmit}>
-      <div className="search-form__row">
+    <form class="search-form" onSubmit={onSubmit}>
+      <div class="search-form__row">
         <input
-          className="search-form__input"
+          class="search-form__input"
           type="text"
           placeholder="Enter a city (e.g. Kyiv, London, Tokyo)"
           value={city}
           onChange={(e) => onCityChange(e.target.value)}
           disabled={isLoading}
-          autoFocus
         />
         <select
-          className="search-form__lang"
+          class="search-form__lang"
           value={lang}
           onChange={(e) => onLangChange(e.target.value)}
           disabled={isLoading}
@@ -35,11 +41,7 @@ export function SearchForm({ city, lang, isLoading, onCityChange, onLangChange, 
           ))}
         </select>
       </div>
-      <button
-        className="search-form__button"
-        type="submit"
-        disabled={!city.trim() || isLoading}
-      >
+      <button class="search-form__button" type="submit" disabled={!city.trim() || isLoading}>
         {isLoading ? 'Generating forecast…' : 'Get forecast'}
       </button>
     </form>

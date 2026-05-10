@@ -2,21 +2,14 @@
  * Shared utilities for API Lambda handlers.
  *
  * Exports:
- *  - dynamo              — shared DynamoDB document client
  *  - toForecastResponse  — ForecastResult → ForecastResponse shape
  *  - fetchForecastById   — load a ForecastResult from DynamoDB by forecastId
  *  - jsonOk              — 200 JSON response helper
  *  - jsonBadRequest      — 400 JSON response helper
  *  - jsonServerError     — 5xx JSON response helper
  */
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
 import type { ForecastResponse, ForecastResult } from '@uweather/core';
-import { Resource } from 'sst';
-
-// ── DynamoDB client ───────────────────────────────────────────────────────────
-
-export const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+import { forecastService } from '../services/index.js';
 
 // ── Data mappers ──────────────────────────────────────────────────────────────
 
@@ -47,14 +40,7 @@ export function toForecastResponse(forecast: ForecastResult): ForecastResponse {
 
 /** Fetch a complete ForecastResult from DynamoDB by forecastId. */
 export async function fetchForecastById(forecastId: string): Promise<ForecastResult> {
-  const result = await dynamo.send(
-    new GetCommand({
-      TableName: Resource.Forecasts.name,
-      Key: { pk: `FORECAST#${forecastId}`, sk: 'META' },
-    }),
-  );
-  if (!result.Item) throw new Error(`Forecast not found: ${forecastId}`);
-  return result.Item as ForecastResult;
+  return forecastService.getById(forecastId);
 }
 
 // ── HTTP response helpers ─────────────────────────────────────────────────────

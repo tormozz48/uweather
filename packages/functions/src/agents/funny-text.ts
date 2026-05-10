@@ -7,14 +7,11 @@
  * humorous weather report in the requested language.
  */
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { Resource } from 'sst';
-import { createLogger, buildFunnyTextPrompt } from '@uweather/core';
+import { buildFunnyTextPrompt, createLogger } from '@uweather/core';
 import type { ConsensusForecast } from '@uweather/core';
+import { forecastService } from '../services/index.js';
 
 const bedrock = new BedrockRuntimeClient({});
-const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const log = createLogger({ function: 'agent-funny-text' });
 
 const MODEL_ID = 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
@@ -91,27 +88,7 @@ export async function handler(input: FunnyTextInput): Promise<FunnyTextOutput> {
  */
 async function fetchRecentHistory(city: string, language: string): Promise<string[]> {
   try {
-    const result = await dynamo.send(
-      new QueryCommand({
-        TableName: Resource.Forecasts.name,
-        IndexName: 'UserHistoryIndex',
-        KeyConditionExpression: 'userId = :uid',
-        FilterExpression: 'city = :city AND #lang = :lang',
-        ExpressionAttributeNames: { '#lang': 'language' },
-        ExpressionAttributeValues: {
-          ':uid': `system#${city}`,
-          ':city': city,
-          ':lang': language,
-        },
-        ScanIndexForward: false, // newest first
-        Limit: MAX_HISTORY_ITEMS,
-        ProjectionExpression: 'funnyText',
-      }),
-    );
-
-    return (result.Items ?? [])
-      .map((item) => item['funnyText'] as string)
-      .filter(Boolean);
+    return await forecastService.listRecentFunnyTexts(city, language, MAX_HISTORY_ITEMS);
   } catch (err) {
     // History is best-effort — don't fail the pipeline if it can't be fetched
     log.warn('Failed to fetch recent history (non-fatal)', {

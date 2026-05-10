@@ -1,9 +1,9 @@
+import type { UnifiedWeatherData, WeatherCondition } from '@uweather/core';
 /**
  * Shared assertion helper for UnifiedWeatherData.
  * Validates field types, enum membership, and value ranges.
  */
 import { expect } from 'vitest';
-import type { UnifiedWeatherData, WeatherCondition } from '@uweather/core';
 
 const VALID_CONDITIONS: WeatherCondition[] = [
   'sunny',

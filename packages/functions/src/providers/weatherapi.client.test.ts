@@ -4,9 +4,9 @@
  * Requires: packages/functions/.env.test
  *   WEATHERAPI_KEY=<your key>
  */
-import { describe, it, expect, beforeAll } from 'vitest';
-import { fetchWeatherAPI } from './weatherapi.client.js';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { assertUnifiedWeather } from '../tests/helpers/assertUnifiedWeather.js';
+import { fetchWeatherAPI } from './weatherapi.client.js';
 
 const TEST_CITY = 'London';
 
@@ -34,14 +34,12 @@ describe('fetchWeatherAPI (integration)', () => {
   });
 
   it('throws on an unknown city', async () => {
-    await expect(
-      fetchWeatherAPI('ThisCityDefinitelyDoesNotExist_XYZ123', apiKey),
-    ).rejects.toThrow(/WeatherAPI error/);
+    await expect(fetchWeatherAPI('ThisCityDefinitelyDoesNotExist_XYZ123', apiKey)).rejects.toThrow(
+      /WeatherAPI error/,
+    );
   });
 
   it('throws on an invalid API key', async () => {
-    await expect(fetchWeatherAPI(TEST_CITY, 'invalid_key')).rejects.toThrow(
-      /WeatherAPI error 401/,
-    );
+    await expect(fetchWeatherAPI(TEST_CITY, 'invalid_key')).rejects.toThrow(/WeatherAPI error 401/);
   });
 });

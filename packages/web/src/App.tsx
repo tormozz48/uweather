@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { getForecast, getHistory } from './api.js';
 import type { ForecastResponse } from './api.js';
-import { getSessionId } from './lib/session.js';
-import { SearchForm } from './components/SearchForm.js';
-import { LoadingSection } from './components/LoadingSection.js';
 import { ErrorCard } from './components/ErrorCard.js';
 import { ForecastSection } from './components/ForecastSection.js';
 import { HistoryList } from './components/HistoryList.js';
+import { LoadingSection } from './components/LoadingSection.js';
+import { SearchForm } from './components/SearchForm.js';
+import { getSessionId } from './lib/session.js';
 
 type AppState =
   | { status: 'idle' }
@@ -67,14 +67,14 @@ export function App() {
   };
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <span className="app-header__logo">🌤️</span>
-        <h1 className="app-header__title">uweather</h1>
-        <p className="app-header__tagline">AI-powered forecasts with a sense of humour</p>
+    <div class="app">
+      <header class="app-header">
+        <span class="app-header__logo">🌤️</span>
+        <h1 class="app-header__title">uweather</h1>
+        <p class="app-header__tagline">AI-powered forecasts with a sense of humour</p>
       </header>
 
-      <main className="app-main">
+      <main class="app-main">
         <SearchForm
           city={city}
           lang={lang}
@@ -86,9 +86,7 @@ export function App() {
 
         {state.status === 'loading' && <LoadingSection />}
 
-        {state.status === 'error' && (
-          <ErrorCard message={state.message} onRetry={handleRetry} />
-        )}
+        {state.status === 'error' && <ErrorCard message={state.message} onRetry={handleRetry} />}
 
         {state.status === 'success' && <ForecastSection forecast={state.forecast} />}
 
@@ -97,7 +95,7 @@ export function App() {
         )}
       </main>
 
-      <footer className="app-footer">
+      <footer class="app-footer">
         <p>Powered by AWS Bedrock · Weather from OpenWeatherMap, WeatherAPI, Open-Meteo</p>
       </footer>
     </div>

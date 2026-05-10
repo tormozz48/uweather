@@ -63,7 +63,7 @@ function degreesToCardinal(deg: number): string {
 
 // ── Transformer ───────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: raw API response shape is validated at runtime
 export function transformOpenWeather(raw: any): UnifiedWeatherData {
   const response = raw as OWMResponse;
   const weatherItem = response.weather[0];

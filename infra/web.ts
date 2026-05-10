@@ -8,7 +8,7 @@
  * SPA routing: errorPage points to index.html so that client-side routes
  * (e.g. /history) return 200 instead of 403/404 from CloudFront.
  */
-import { api } from './api';
+import { api } from './api.ts';
 
 export const web = new sst.aws.StaticSite('Web', {
   path: 'packages/web',

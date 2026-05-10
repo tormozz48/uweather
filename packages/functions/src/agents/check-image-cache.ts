@@ -8,13 +8,10 @@
  *   { cacheHit: true,  imageUrl: string, imageCacheKey: string } — skip image gen
  *   { cacheHit: false, imageCacheKey: string }                    — generate image
  */
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { Resource } from 'sst';
-import { createLogger, buildImageCacheKey } from '@uweather/core';
+import { buildImageCacheKey, createLogger } from '@uweather/core';
 import type { ConsensusForecast, TimeSlot } from '@uweather/core';
+import { forecastService } from '../services/index.js';
 
-const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const log = createLogger({ function: 'check-image-cache' });
 
 export interface CheckImageCacheInput {
@@ -39,20 +36,7 @@ export async function handler(input: CheckImageCacheInput): Promise<CheckImageCa
 
   log.info('Checking image cache', { imageCacheKey });
 
-  const result = await dynamo.send(
-    new QueryCommand({
-      TableName: Resource.Forecasts.name,
-      IndexName: 'ImageCacheIndex',
-      KeyConditionExpression: 'imageCacheKey = :key',
-      ExpressionAttributeValues: { ':key': imageCacheKey },
-      ScanIndexForward: false, // newest first
-      Limit: 1,
-      ProjectionExpression: 'imageUrl',
-    }),
-  );
-
-  const item = result.Items?.[0];
-  const imageUrl = item?.['imageUrl'] as string | undefined;
+  const imageUrl = await forecastService.findImageUrl(imageCacheKey);
 
   if (imageUrl) {
     log.info('Image cache hit', { imageCacheKey, imageUrl });

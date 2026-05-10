@@ -39,14 +39,7 @@ export async function fetchOpenMeteo(city: string): Promise<UnifiedWeatherData> 
   }
 
   // Step 2: Fetch current weather + daily UV/sunrise/sunset
-  const weatherUrl =
-    `${FORECAST_URL}` +
-    `?latitude=${geoResult.latitude}` +
-    `&longitude=${geoResult.longitude}` +
-    `&current=${CURRENT_PARAMS}` +
-    `&daily=${DAILY_PARAMS}` +
-    `&timezone=UTC` +
-    `&forecast_days=1`;
+  const weatherUrl = `${FORECAST_URL}?latitude=${geoResult.latitude}&longitude=${geoResult.longitude}&current=${CURRENT_PARAMS}&daily=${DAILY_PARAMS}&timezone=UTC&forecast_days=1`;
 
   const weatherResponse = await fetch(weatherUrl);
   if (!weatherResponse.ok) {

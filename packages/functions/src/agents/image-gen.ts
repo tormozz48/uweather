@@ -9,15 +9,15 @@
  * Endpoint: POST https://gateway.pixazo.ai/getImage/v1/getSDXLImage
  * Auth header: Ocp-Apim-Subscription-Key
  */
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { Resource } from 'sst';
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import {
-  createLogger,
-  buildImageGenPrompt,
   buildImageGenNegativePrompt,
+  buildImageGenPrompt,
   buildS3ImageKey,
+  createLogger,
 } from '@uweather/core';
 import type { ConsensusForecast, TimeSlot } from '@uweather/core';
+import { Resource } from 'sst';
 
 const s3 = new S3Client({});
 const log = createLogger({ function: 'agent-image-gen' });
@@ -88,21 +88,26 @@ export async function handler(input: ImageGenInput): Promise<ImageGenOutput> {
   log.info('Pixazo image URL received', { pixazoImageUrl });
 
   // Download the generated image from Pixazo's CDN
-  const { imageBuffer, contentType } = await log.timed('Download image from Pixazo CDN', async () => {
-    const imageResponse = await fetch(pixazoImageUrl);
-    if (!imageResponse.ok) {
-      throw new Error(`Failed to download image from Pixazo CDN: ${imageResponse.status}`);
-    }
-    const arrayBuffer = await imageResponse.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    // Infer content type from the URL extension (Pixazo typically returns PNG)
-    const ext = pixazoImageUrl.split('?')[0].split('.').pop()?.toLowerCase();
-    const mime =
-      ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' :
-      ext === 'webp' ? 'image/webp' :
-      'image/png';
-    return { imageBuffer: buffer, contentType: mime };
-  });
+  const { imageBuffer, contentType } = await log.timed(
+    'Download image from Pixazo CDN',
+    async () => {
+      const imageResponse = await fetch(pixazoImageUrl);
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to download image from Pixazo CDN: ${imageResponse.status}`);
+      }
+      const arrayBuffer = await imageResponse.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      // Infer content type from the URL extension (Pixazo typically returns PNG)
+      const ext = pixazoImageUrl.split('?')[0].split('.').pop()?.toLowerCase();
+      const mime =
+        ext === 'jpg' || ext === 'jpeg'
+          ? 'image/jpeg'
+          : ext === 'webp'
+            ? 'image/webp'
+            : 'image/png';
+      return { imageBuffer: buffer, contentType: mime };
+    },
+  );
 
   const s3Key = buildS3ImageKey(input.imageCacheKey);
 

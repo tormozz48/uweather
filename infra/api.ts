@@ -1,3 +1,4 @@
+import { forecastPipeline, telegramBotToken } from './pipeline.ts';
 /**
  * infra/api.ts — Phase 4: API Gateway routes + Lambda bindings
  *
@@ -10,15 +11,7 @@
  * Import order requirement: pipeline.ts must be imported before this file
  * because api.ts depends on forecastPipeline and telegramBotToken.
  */
-import {
-  weatherCacheTable,
-  forecastsTable,
-  usersTable,
-} from './storage';
-import {
-  forecastPipeline,
-  telegramBotToken,
-} from './pipeline';
+import { forecastsTable, usersTable, weatherCacheTable } from './storage.ts';
 
 /**
  * API Gateway HTTP API.
@@ -101,4 +94,3 @@ api.route('POST /telegram/webhook', {
   timeout: '120 seconds',
   memory: '512 MB',
 });
-

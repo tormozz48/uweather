@@ -1,9 +1,9 @@
 /**
  * Integration test — Open-Meteo provider (no API key required).
  */
-import { describe, it, expect } from 'vitest';
-import { fetchOpenMeteo } from './open-meteo.client.js';
+import { describe, expect, it } from 'vitest';
 import { assertUnifiedWeather } from '../tests/helpers/assertUnifiedWeather.js';
+import { fetchOpenMeteo } from './open-meteo.client.js';
 
 const TEST_CITY = 'London';
 
@@ -19,9 +19,9 @@ describe('fetchOpenMeteo (integration)', () => {
   });
 
   it('throws on an unknown city', async () => {
-    await expect(
-      fetchOpenMeteo('ThisCityDefinitelyDoesNotExist_XYZ123'),
-    ).rejects.toThrow(/city not found/);
+    await expect(fetchOpenMeteo('ThisCityDefinitelyDoesNotExist_XYZ123')).rejects.toThrow(
+      /city not found/,
+    );
   });
 
   it('returns non-zero uv_index_max (populated from daily array)', async () => {

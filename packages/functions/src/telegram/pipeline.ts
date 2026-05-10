@@ -7,15 +7,12 @@
  *  - fetchForecastHistory — query the last N forecasts for a user
  */
 import { randomUUID } from 'node:crypto';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DescribeExecutionCommand, SFNClient, StartExecutionCommand } from '@aws-sdk/client-sfn';
-import { DynamoDBDocumentClient, GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import type { ForecastResult } from '@uweather/core';
 import { createLogger, getCurrentTimeSlot, normalizeCity, toDateString } from '@uweather/core';
-import { Resource } from 'sst';
 import { handler as orchestratorHandler } from '../orchestrator.js';
+import { forecastService } from '../services/index.js';
 
-const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const sfn = new SFNClient({});
 const log = createLogger({ function: 'telegram-pipeline' });
 
@@ -52,14 +49,7 @@ async function pollExecution(executionArn: string, timeoutMs = 90_000): Promise<
 }
 
 async function fetchForecastById(forecastId: string): Promise<ForecastResult> {
-  const result = await dynamo.send(
-    new GetCommand({
-      TableName: Resource.Forecasts.name,
-      Key: { pk: `FORECAST#${forecastId}`, sk: 'META' },
-    }),
-  );
-  if (!result.Item) throw new Error(`Forecast not found: ${forecastId}`);
-  return result.Item as ForecastResult;
+  return forecastService.getById(forecastId);
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -118,15 +108,5 @@ export async function fetchForecastHistory(
   userId: string,
   limit: number,
 ): Promise<ForecastResult[]> {
-  const result = await dynamo.send(
-    new QueryCommand({
-      TableName: Resource.Forecasts.name,
-      IndexName: 'UserHistoryIndex',
-      KeyConditionExpression: 'userId = :uid',
-      ExpressionAttributeValues: { ':uid': userId },
-      ScanIndexForward: false,
-      Limit: limit,
-    }),
-  );
-  return (result.Items ?? []) as ForecastResult[];
+  return forecastService.listByUser(userId, limit);
 }

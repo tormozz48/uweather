@@ -8,12 +8,10 @@
  *   userId  — required
  *   limit   — optional, 1–50, default 10
  */
-import { QueryCommand } from '@aws-sdk/lib-dynamodb';
-import type { ForecastResult } from '@uweather/core';
 import { createLogger } from '@uweather/core';
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
-import { Resource } from 'sst';
-import { dynamo, jsonBadRequest, jsonOk, jsonServerError, toForecastResponse } from './utils.js';
+import { forecastService } from '../services/index.js';
+import { jsonBadRequest, jsonOk, jsonServerError, toForecastResponse } from './utils.js';
 
 const log = createLogger({ function: 'api-history' });
 
@@ -36,20 +34,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   log.info('History request', { userId, limit });
 
   try {
-    const result = await dynamo.send(
-      new QueryCommand({
-        TableName: Resource.Forecasts.name,
-        IndexName: 'UserHistoryIndex',
-        KeyConditionExpression: 'userId = :uid',
-        ExpressionAttributeValues: { ':uid': userId },
-        ScanIndexForward: false, // newest first
-        Limit: limit,
-      }),
-    );
-
-    const forecasts = ((result.Items as ForecastResult[] | undefined) ?? []).map(
-      toForecastResponse,
-    );
+    const forecasts = (await forecastService.listByUser(userId, limit)).map(toForecastResponse);
 
     log.info('History delivered', { userId, count: forecasts.length });
 

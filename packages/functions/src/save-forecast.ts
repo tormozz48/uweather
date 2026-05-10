@@ -9,14 +9,10 @@
  * so the UserHistoryIndex GSI supports the "show my past forecasts" query.
  * The imageCacheKey is stored so the ImageCacheIndex GSI supports image reuse.
  */
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
-import { Resource } from 'sst';
-import { ulid } from 'ulid';
 import { createLogger } from '@uweather/core';
-import type { ConsensusForecast, ForecastResult, TimeSlot } from '@uweather/core';
+import type { ConsensusForecast, TimeSlot } from '@uweather/core';
+import { forecastService } from './services/index.js';
 
-const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const log = createLogger({ function: 'save-forecast' });
 
 export interface SaveForecastInput {
@@ -40,11 +36,7 @@ export interface SaveForecastOutput {
 }
 
 export async function handler(input: SaveForecastInput): Promise<SaveForecastOutput> {
-  const forecastId = ulid();
-  const createdAt = new Date().toISOString();
-
   log.info('Saving forecast', {
-    forecastId,
     city: input.city,
     language: input.language,
     userId: input.userId,
@@ -52,10 +44,7 @@ export async function handler(input: SaveForecastInput): Promise<SaveForecastOut
     imageCacheKey: input.imageCacheKey,
   });
 
-  const record: ForecastResult & { pk: string; sk: string } = {
-    pk: `FORECAST#${forecastId}`,
-    sk: 'META',
-    forecastId,
+  const forecastId = await forecastService.save({
     userId: input.userId,
     city: input.city,
     country: input.consensus.country,
@@ -67,15 +56,7 @@ export async function handler(input: SaveForecastInput): Promise<SaveForecastOut
     imageUrl: input.imageUrl,
     imageCacheKey: input.imageCacheKey,
     sourcesUsed: input.sourcesUsed,
-    createdAt,
-  };
-
-  await dynamo.send(
-    new PutCommand({
-      TableName: Resource.Forecasts.name,
-      Item: record,
-    }),
-  );
+  });
 
   log.info('Forecast saved', { forecastId, city: input.city });
 

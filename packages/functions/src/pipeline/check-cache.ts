@@ -8,13 +8,10 @@
  * If cacheHit=true, the Step Functions Choice state skips FetchWeather and
  * proceeds directly to agents (added in Phase 3).
  */
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { Resource } from 'sst';
 import { createLogger, normalizeCity } from '@uweather/core';
-import type { UnifiedWeatherData, WeatherCacheEntry } from '@uweather/core';
+import type { UnifiedWeatherData } from '@uweather/core';
+import { weatherCacheService } from '../services/index.js';
 
-const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const log = createLogger({ function: 'pipeline-check-cache' });
 
 const CACHE_FRESH_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
@@ -37,23 +34,10 @@ export async function handler(input: CheckCacheInput): Promise<CheckCacheOutput>
 
   log.info('Checking WeatherCache', { city: cityNormalized, date });
 
-  const result = await dynamo.send(
-    new QueryCommand({
-      TableName: Resource.WeatherCache.name,
-      KeyConditionExpression: 'pk = :pk AND begins_with(sk, :datePrefix)',
-      ExpressionAttributeValues: {
-        ':pk': `CACHE#${cityNormalized}`,
-        ':datePrefix': `${date}#`,
-      },
-    }),
-  );
-
-  const items = (result.Items ?? []) as WeatherCacheEntry[];
+  const items = await weatherCacheService.load(cityNormalized, date);
   const cutoffMs = Date.now() - CACHE_FRESH_WINDOW_MS;
 
-  const freshItems = items.filter(
-    (item) => new Date(item.fetchedAt).getTime() > cutoffMs,
-  );
+  const freshItems = items.filter((item) => new Date(item.fetchedAt).getTime() > cutoffMs);
 
   const freshProviders = freshItems.map((item) => item.data);
 

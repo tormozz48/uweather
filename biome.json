@@ -29,9 +29,21 @@
       "quoteStyle": "single",
       "trailingCommas": "all"
     },
-    "globals": ["$config", "$app", "$util", "$transform", "$interpolate", "$resolve"]
+    "globals": ["$config", "$app", "$util", "$transform", "$interpolate", "$resolve", "$jsonStringify", "sst", "aws"]
   },
   "files": {
-    "ignore": ["node_modules", ".sst", "dist", "build", ".turbo"]
-  }
+    "ignore": ["node_modules", ".sst", "dist", "build", ".turbo", "**/sst-env.d.ts"]
+  },
+  "overrides": [
+    {
+      "include": ["packages/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUndeclaredDependencies": "off"
+          }
+        }
+      }
+    }
+  ]
 }

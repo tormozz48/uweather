@@ -27,7 +27,8 @@ const CONDITION_VISUALS: Record<WeatherCondition, string> = {
   cloudy: 'solid grey overcast sky, muted soft lighting, no direct sun',
   rain: 'rain falling in visible streaks, wet shiny streets, puddles, people with colourful umbrellas',
   snow: 'gentle snow falling, white-covered rooftops and streets, frost on windows',
-  thunderstorm: 'dramatic dark purple storm clouds, lightning bolt in the distance, heavy rain, wind-bent trees',
+  thunderstorm:
+    'dramatic dark purple storm clouds, lightning bolt in the distance, heavy rain, wind-bent trees',
   fog: 'thick morning fog rolling through streets, muted ethereal colours, mysterious silhouettes',
   windy: 'trees and flags bending in strong wind, leaves swirling, dynamic dramatic sky',
 };
@@ -37,13 +38,7 @@ export function buildImageGenPrompt(params: ImageGenPromptParams): string {
   const conditionDesc = CONDITION_VISUALS[params.consensus.condition];
   const temp = params.consensus.temperature;
 
-  return (
-    `A vibrant stylized digital illustration of ${params.city} city skyline with its iconic landmark. ` +
-    `${conditionDesc}. ${timeDesc}. ` +
-    `Temperature ${temp}°C, ${params.consensus.conditionDescription}. ` +
-    `Art style: colourful friendly cartoon illustration, slightly whimsical, suitable for a weather app. ` +
-    `Wide landscape format. High quality, detailed, no text or labels.`
-  );
+  return `A vibrant stylized digital illustration of ${params.city} city skyline with its iconic landmark. ${conditionDesc}. ${timeDesc}. Temperature ${temp}°C, ${params.consensus.conditionDescription}. Art style: colourful friendly cartoon illustration, slightly whimsical, suitable for a weather app. Wide landscape format. High quality, detailed, no text or labels.`;
 }
 
 export function buildImageGenNegativePrompt(): string {

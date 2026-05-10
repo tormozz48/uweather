@@ -1,3 +1,5 @@
+import { createLogger, normalizeCity } from '@uweather/core';
+import type { UnifiedWeatherData } from '@uweather/core';
 /**
  * WeatherAPI provider Lambda.
  *
@@ -6,14 +8,10 @@
  *
  * Throws on any failure so Step Functions retry/catch logic engages.
  */
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { Resource } from 'sst';
-import { createLogger, normalizeCity } from '@uweather/core';
-import type { UnifiedWeatherData } from '@uweather/core';
+import { weatherCacheService } from '../services/index.js';
 import { fetchWeatherAPI } from './weatherapi.client.js';
 
-const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const log = createLogger({ function: 'provider-weatherapi' });
 
 export interface ProviderInput {
@@ -34,22 +32,8 @@ export async function handler(input: ProviderInput): Promise<ProviderOutput> {
 
   const data = await fetchWeatherAPI(city, Resource.WeatherApiKey.value);
 
-  // Write to WeatherCache
   const cityNormalized = normalizeCity(city);
-  const ttl = Math.floor(Date.now() / 1000) + 30 * 60; // 30 min TTL
-
-  await dynamo.send(
-    new PutCommand({
-      TableName: Resource.WeatherCache.name,
-      Item: {
-        pk: `CACHE#${cityNormalized}`,
-        sk: `${date}#weatherapi`,
-        data,
-        fetchedAt: data.fetchedAt,
-        ttl,
-      },
-    }),
-  );
+  await weatherCacheService.save(cityNormalized, date, 'weatherapi', data);
 
   log.info('Weather cached', { city: cityNormalized, provider: 'weatherapi', date });
   return { provider: 'weatherapi', success: true, data };

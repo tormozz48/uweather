@@ -23,12 +23,7 @@
  *                                                                  Both paths ──►
  *   SaveForecast ──► PipelineSuccess
  */
-import {
-  weatherCacheTable,
-  forecastsTable,
-  imagesBucket,
-  imagesCdn,
-} from './storage';
+import { forecastsTable, imagesBucket, imagesCdn, weatherCacheTable } from './storage.ts';
 
 // ── SST Secrets ───────────────────────────────────────────────────────────────
 
@@ -129,7 +124,7 @@ const bedrockTextPolicy = $resolve([bedrockRegion, bedrockAccountId]).apply(([re
         Action: 'bedrock:InvokeModel',
         Resource: [
           `arn:aws:bedrock:${region}:${accountId}:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0`,
-          `arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0`,
+          'arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0',
         ],
       },
     ],

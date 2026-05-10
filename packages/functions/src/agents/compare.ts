@@ -12,8 +12,8 @@
  *   - Direct UnifiedWeatherData array (produced by the cache-hit path)
  */
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
-import { createLogger, buildComparePrompt } from '@uweather/core';
-import type { UnifiedWeatherData, ConsensusForecast } from '@uweather/core';
+import { buildComparePrompt, createLogger } from '@uweather/core';
+import type { ConsensusForecast, UnifiedWeatherData } from '@uweather/core';
 
 const bedrock = new BedrockRuntimeClient({});
 const log = createLogger({ function: 'agent-compare' });
@@ -42,12 +42,16 @@ export async function handler(input: CompareInput): Promise<CompareOutput> {
 
   // Normalise — accept both wrapped { success, data } objects and bare UnifiedWeatherData
   const weatherDataArray: UnifiedWeatherData[] = input.providerResults
-    .filter((r): r is
-      | UnifiedWeatherData
-      | { success: true; provider: string; data: UnifiedWeatherData } => {
-      if ('success' in r) return r.success === true && r.data != null;
-      return true;
-    })
+    .filter(
+      (
+        r,
+      ): r is
+        | UnifiedWeatherData
+        | { success: true; provider: string; data: UnifiedWeatherData } => {
+        if ('success' in r) return r.success === true && r.data != null;
+        return true;
+      },
+    )
     .map((r) =>
       'success' in r && 'data' in r
         ? (r as { success: true; provider: string; data: UnifiedWeatherData }).data
@@ -58,9 +62,11 @@ export async function handler(input: CompareInput): Promise<CompareOutput> {
     throw new Error(`Agent1_Compare: no successful provider data for ${input.city}`);
   }
 
-  const sourcesUsed = weatherDataArray.map(
-    (w) => w.provider,
-  ) as ('openweather' | 'weatherapi' | 'open-meteo')[];
+  const sourcesUsed = weatherDataArray.map((w) => w.provider) as (
+    | 'openweather'
+    | 'weatherapi'
+    | 'open-meteo'
+  )[];
 
   log.info('Comparing weather data', { city: input.city, providers: sourcesUsed });
 

@@ -49,4 +49,3 @@ export const resourceGroup = new aws.resourcegroups.Group('UweatherResourceGroup
     ManagedBy: 'sst',
   },
 });
-

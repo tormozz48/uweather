@@ -31,13 +31,13 @@ export interface HistoryResponse {
   forecasts: ForecastResponse[];
 }
 
-const BASE_URL = (import.meta.env['VITE_API_URL'] as string | undefined) ?? '';
+const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
 async function apiFetch<T>(path: string): Promise<T> {
   const response = await fetch(`${BASE_URL}${path}`);
 
   if (!response.ok) {
-    const body = await response.json().catch(() => ({})) as { error?: string };
+    const body = (await response.json().catch(() => ({}))) as { error?: string };
     throw new Error(body.error ?? `Request failed: ${response.status} ${response.statusText}`);
   }
 

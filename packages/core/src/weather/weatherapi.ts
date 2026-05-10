@@ -40,13 +40,12 @@ interface WACurrentResponse {
 // Full code list: https://www.weatherapi.com/docs/weather_conditions.json
 
 const RAIN_CODES = new Set([
-  1063, 1180, 1183, 1186, 1189, 1192, 1195, 1198, 1201, 1240, 1243, 1246,
-  1069, 1072, 1150, 1153, 1168, 1171, 1204, 1207, 1249, 1252,
+  1063, 1180, 1183, 1186, 1189, 1192, 1195, 1198, 1201, 1240, 1243, 1246, 1069, 1072, 1150, 1153,
+  1168, 1171, 1204, 1207, 1249, 1252,
 ]);
 
 const SNOW_CODES = new Set([
-  1066, 1114, 1117, 1210, 1213, 1216, 1219, 1222, 1225, 1237, 1255, 1258,
-  1261, 1264,
+  1066, 1114, 1117, 1210, 1213, 1216, 1219, 1222, 1225, 1237, 1255, 1258, 1261, 1264,
 ]);
 
 const THUNDERSTORM_CODES = new Set([1087, 1273, 1276, 1279, 1282]);
@@ -64,7 +63,7 @@ function mapWACondition(code: number): WeatherCondition {
 
 // ── Transformer ───────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: raw API response shape is validated at runtime
 export function transformWeatherAPI(raw: any): UnifiedWeatherData {
   const response = raw as WACurrentResponse;
   const now = new Date();
