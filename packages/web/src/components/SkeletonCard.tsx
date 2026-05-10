@@ -1,11 +1,11 @@
 export function SkeletonCard() {
   return (
-    <div class="skeleton-card">
-      <div class="skeleton skeleton--title" />
-      <div class="skeleton skeleton--image" />
-      <div class="skeleton skeleton--line" />
-      <div class="skeleton skeleton--line skeleton--short" />
-      <div class="skeleton skeleton--line" />
+    <div className="skeleton-card">
+      <div className="skeleton skeleton--title" />
+      <div className="skeleton skeleton--image" />
+      <div className="skeleton skeleton--line" />
+      <div className="skeleton skeleton--line skeleton--short" />
+      <div className="skeleton skeleton--line" />
     </div>
   );
 }

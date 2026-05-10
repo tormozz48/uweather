@@ -48,7 +48,7 @@ async function pollExecution(executionArn: string, timeoutMs = 90_000): Promise<
   throw new Error('Forecast timed out — please try again');
 }
 
-async function fetchForecastById(forecastId: string): Promise<ForecastResult> {
+function fetchForecastById(forecastId: string): Promise<ForecastResult> {
   return forecastService.getById(forecastId);
 }
 
@@ -104,7 +104,7 @@ export async function runPipeline(
  * Return the last `limit` forecasts for a Telegram user, newest-first.
  * Queries the UserHistoryIndex GSI on the Forecasts table.
  */
-export async function fetchForecastHistory(
+export function fetchForecastHistory(
   userId: string,
   limit: number,
 ): Promise<ForecastResult[]> {

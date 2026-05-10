@@ -6,4 +6,5 @@
 
 /// <reference path="../../sst-env.d.ts" />
 
-import 'sst';
+import "sst"
+export {}

@@ -7,14 +7,14 @@ interface ForecastSectionProps {
 
 export function ForecastSection({ forecast }: ForecastSectionProps) {
   return (
-    <div class="forecast-section">
+    <div className="forecast-section">
       <img
-        class="forecast-image"
+        className="forecast-image"
         src={forecast.imageUrl}
         alt={`Weather illustration for ${forecast.city}`}
       />
       <WeatherCard forecast={forecast} />
-      <div class="funny-text">
+      <div className="funny-text">
         {forecast.funnyText
           .split('\n')
           .filter((para) => para.trim())

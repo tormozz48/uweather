@@ -4,94 +4,95 @@
 /* deno-fmt-ignore-file */
 /* biome-ignore-all lint: auto-generated */
 
-declare module 'sst' {
+declare module "sst" {
   export interface Resource {
-    Agent1CompareFn: {
-      name: string;
-      type: 'sst.aws.Function';
-    };
-    Agent2FunnyTextFn: {
-      name: string;
-      type: 'sst.aws.Function';
-    };
-    Agent3ImageGenFn: {
-      name: string;
-      type: 'sst.aws.Function';
-    };
-    Api: {
-      type: 'sst.aws.ApiGatewayV2';
-      url: string;
-    };
-    CheckCacheFn: {
-      name: string;
-      type: 'sst.aws.Function';
-    };
-    CheckImageCacheFn: {
-      name: string;
-      type: 'sst.aws.Function';
-    };
-    Forecasts: {
-      name: string;
-      type: 'sst.aws.Dynamo';
-    };
-    ImagesCdn: {
-      type: 'sst.aws.Router';
-      url: string;
-    };
-    OpenMeteoFn: {
-      name: string;
-      type: 'sst.aws.Function';
-    };
-    OpenWeatherApiKey: {
-      type: 'sst.sst.Secret';
-      value: string;
-    };
-    OpenWeatherFn: {
-      name: string;
-      type: 'sst.aws.Function';
-    };
-    OrchestratorFn: {
-      name: string;
-      type: 'sst.aws.Function';
-    };
-    PixazoApiKey: {
-      type: 'sst.sst.Secret';
-      value: string;
-    };
-    SaveForecastFn: {
-      name: string;
-      type: 'sst.aws.Function';
-    };
-    TelegramBotToken: {
-      type: 'sst.sst.Secret';
-      value: string;
-    };
-    Users: {
-      name: string;
-      type: 'sst.aws.Dynamo';
-    };
-    UweatherImages: {
-      name: string;
-      type: 'sst.aws.Bucket';
-    };
-    WeatherApiFn: {
-      name: string;
-      type: 'sst.aws.Function';
-    };
-    WeatherApiKey: {
-      type: 'sst.sst.Secret';
-      value: string;
-    };
-    WeatherCache: {
-      name: string;
-      type: 'sst.aws.Dynamo';
-    };
-    Web: {
-      type: 'sst.aws.StaticSite';
-      url: string;
-    };
+    "Agent1CompareFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "Agent2FunnyTextFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "Agent3ImageGenFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "Api": {
+      "type": "sst.aws.ApiGatewayV2"
+      "url": string
+    }
+    "CheckCacheFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "CheckImageCacheFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "Forecasts": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
+    "ImagesCdn": {
+      "type": "sst.aws.Router"
+      "url": string
+    }
+    "OpenMeteoFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "OpenWeatherApiKey": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "OpenWeatherFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "OrchestratorFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "PixazoApiKey": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "SaveForecastFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "TelegramBotToken": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "Users": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
+    "UweatherImages": {
+      "name": string
+      "type": "sst.aws.Bucket"
+    }
+    "WeatherApiFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "WeatherApiKey": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "WeatherCache": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
+    "Web": {
+      "type": "sst.aws.StaticSite"
+      "url": string
+    }
   }
 }
 /// <reference path="sst-env.d.ts" />
 
-import 'sst';
+import "sst"
+export {}

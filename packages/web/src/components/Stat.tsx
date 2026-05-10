@@ -6,10 +6,10 @@ interface StatProps {
 
 export function Stat({ icon, label, value }: StatProps) {
   return (
-    <div class="stat">
-      <span class="stat__icon">{icon}</span>
-      <span class="stat__label">{label}</span>
-      <span class="stat__value">{value}</span>
+    <div className="stat">
+      <span className="stat__icon">{icon}</span>
+      <span className="stat__label">{label}</span>
+      <span className="stat__value">{value}</span>
     </div>
   );
 }

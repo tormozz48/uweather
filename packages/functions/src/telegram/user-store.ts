@@ -25,6 +25,6 @@ export async function upsertUser(chatId: number, updates: UserUpdates): Promise<
 }
 
 /** Return the stored language preference for a user, defaulting to "en". */
-export async function getUserLanguage(chatId: number): Promise<string> {
+export function getUserLanguage(chatId: number): Promise<string> {
   return userService.getLanguage('telegram', chatId);
 }

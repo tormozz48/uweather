@@ -44,6 +44,36 @@
           }
         }
       }
+    },
+    {
+      "include": ["packages/functions/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noNodejsModules": "off"
+          }
+        }
+      }
+    },
+    {
+      "include": ["packages/web/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noReactSpecificProps": "off"
+          }
+        }
+      }
+    },
+    {
+      "include": ["packages/functions/src/tests/helpers/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noMisplacedAssertion": "off"
+          }
+        }
+      }
     }
   ]
 }

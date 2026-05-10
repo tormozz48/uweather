@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { getForecast, getHistory } from './api.js';
 import type { ForecastResponse } from './api.js';
 import { ErrorCard } from './components/ErrorCard.js';
@@ -31,7 +31,7 @@ export function App() {
   }, [sessionId]);
 
   const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
+    async (e: FormEvent) => {
       e.preventDefault();
       const trimmed = city.trim();
       if (!trimmed || state.status === 'loading') return;
@@ -67,14 +67,14 @@ export function App() {
   };
 
   return (
-    <div class="app">
-      <header class="app-header">
-        <span class="app-header__logo">🌤️</span>
-        <h1 class="app-header__title">uweather</h1>
-        <p class="app-header__tagline">AI-powered forecasts with a sense of humour</p>
+    <div className="app">
+      <header className="app-header">
+        <span className="app-header__logo">🌤️</span>
+        <h1 className="app-header__title">uweather</h1>
+        <p className="app-header__tagline">AI-powered forecasts with a sense of humour</p>
       </header>
 
-      <main class="app-main">
+      <main className="app-main">
         <SearchForm
           city={city}
           lang={lang}
@@ -95,7 +95,7 @@ export function App() {
         )}
       </main>
 
-      <footer class="app-footer">
+      <footer className="app-footer">
         <p>Powered by AWS Bedrock · Weather from OpenWeatherMap, WeatherAPI, Open-Meteo</p>
       </footer>
     </div>

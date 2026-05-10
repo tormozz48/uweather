@@ -1,3 +1,4 @@
+import type { FormEvent } from 'react';
 import { LANGUAGES } from '../constants/weather.js';
 
 interface SearchFormProps {
@@ -6,7 +7,7 @@ interface SearchFormProps {
   isLoading: boolean;
   onCityChange: (city: string) => void;
   onLangChange: (lang: string) => void;
-  onSubmit: (e: React.FormEvent) => void;
+  onSubmit: (e: FormEvent) => void;
 }
 
 export function SearchForm({
@@ -18,10 +19,10 @@ export function SearchForm({
   onSubmit,
 }: SearchFormProps) {
   return (
-    <form class="search-form" onSubmit={onSubmit}>
-      <div class="search-form__row">
+    <form className="search-form" onSubmit={onSubmit}>
+      <div className="search-form__row">
         <input
-          class="search-form__input"
+          className="search-form__input"
           type="text"
           placeholder="Enter a city (e.g. Kyiv, London, Tokyo)"
           value={city}
@@ -29,7 +30,7 @@ export function SearchForm({
           disabled={isLoading}
         />
         <select
-          class="search-form__lang"
+          className="search-form__lang"
           value={lang}
           onChange={(e) => onLangChange(e.target.value)}
           disabled={isLoading}
@@ -41,7 +42,7 @@ export function SearchForm({
           ))}
         </select>
       </div>
-      <button class="search-form__button" type="submit" disabled={!city.trim() || isLoading}>
+      <button className="search-form__button" type="submit" disabled={!city.trim() || isLoading}>
         {isLoading ? 'Generating forecast…' : 'Get forecast'}
       </button>
     </form>

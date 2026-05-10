@@ -38,6 +38,73 @@ export interface ImageGenOutput {
   imageCacheKey: string;
 }
 
+/** Call the Pixazo SDXL v1.0 API and return the hosted image URL it provides. */
+async function generateImageWithPixazo(prompt: string, negativePrompt: string): Promise<string> {
+  const response = await fetch(PIXAZO_SDXL_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',
+      'Ocp-Apim-Subscription-Key': Resource.PixazoApiKey.value,
+    },
+    body: JSON.stringify({
+      prompt,
+      negative_prompt: negativePrompt,
+      height: 1024,
+      width: 1024,
+      num_steps: 20,
+      guidance_scale: 7,
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`Pixazo API error: ${response.status} ${response.statusText} — ${body}`);
+  }
+
+  const data = (await response.json()) as { imageUrl?: string };
+  if (!data.imageUrl) {
+    throw new Error('Agent3_ImageGen: Pixazo returned no imageUrl');
+  }
+  return data.imageUrl;
+}
+
+/** Infer a MIME type from a URL's file extension, defaulting to PNG. */
+function inferContentType(url: string): string {
+  const ext = url.split('?')[0].split('.').pop()?.toLowerCase();
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+  if (ext === 'webp') return 'image/webp';
+  return 'image/png';
+}
+
+/** Download a remote image and return its buffer plus MIME type. */
+async function downloadImage(url: string): Promise<{ imageBuffer: Buffer; contentType: string }> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to download image from Pixazo CDN: ${response.status}`);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  return { imageBuffer: Buffer.from(arrayBuffer), contentType: inferContentType(url) };
+}
+
+/** Upload an image buffer to S3 and return its CloudFront URL. */
+async function uploadToS3(
+  s3Key: string,
+  imageBuffer: Buffer,
+  contentType: string,
+): Promise<string> {
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: Resource.UweatherImages.name,
+      Key: s3Key,
+      Body: imageBuffer,
+      ContentType: contentType,
+      CacheControl: 'public, max-age=86400', // 24-hour browser cache
+    }),
+  );
+  return `${Resource.ImagesCdn.url}/${s3Key}`;
+}
+
 export async function handler(input: ImageGenInput): Promise<ImageGenOutput> {
   log.info('Agent3_ImageGen starting', {
     city: input.city,
@@ -51,80 +118,21 @@ export async function handler(input: ImageGenInput): Promise<ImageGenOutput> {
     city: input.city,
     timeSlot: input.timeSlot,
   });
-
   const negativePrompt = buildImageGenNegativePrompt();
 
-  // Call Pixazo SDXL v1.0 API — returns a hosted image URL
-  const pixazoImageUrl = await log.timed('Pixazo SDXL - image-gen', async () => {
-    const response = await fetch(PIXAZO_SDXL_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-        'Ocp-Apim-Subscription-Key': Resource.PixazoApiKey.value,
-      },
-      body: JSON.stringify({
-        prompt,
-        negative_prompt: negativePrompt,
-        height: 1024,
-        width: 1024,
-        num_steps: 20,
-        guidance_scale: 7,
-      }),
-    });
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      throw new Error(`Pixazo API error: ${response.status} ${response.statusText} — ${body}`);
-    }
-
-    const data = (await response.json()) as { imageUrl?: string };
-    if (!data.imageUrl) {
-      throw new Error('Agent3_ImageGen: Pixazo returned no imageUrl');
-    }
-    return data.imageUrl;
-  });
-
+  const pixazoImageUrl = await log.timed('Pixazo SDXL - image-gen', () =>
+    generateImageWithPixazo(prompt, negativePrompt),
+  );
   log.info('Pixazo image URL received', { pixazoImageUrl });
 
-  // Download the generated image from Pixazo's CDN
-  const { imageBuffer, contentType } = await log.timed(
-    'Download image from Pixazo CDN',
-    async () => {
-      const imageResponse = await fetch(pixazoImageUrl);
-      if (!imageResponse.ok) {
-        throw new Error(`Failed to download image from Pixazo CDN: ${imageResponse.status}`);
-      }
-      const arrayBuffer = await imageResponse.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      // Infer content type from the URL extension (Pixazo typically returns PNG)
-      const ext = pixazoImageUrl.split('?')[0].split('.').pop()?.toLowerCase();
-      const mime =
-        ext === 'jpg' || ext === 'jpeg'
-          ? 'image/jpeg'
-          : ext === 'webp'
-            ? 'image/webp'
-            : 'image/png';
-      return { imageBuffer: buffer, contentType: mime };
-    },
+  const { imageBuffer, contentType } = await log.timed('Download image from Pixazo CDN', () =>
+    downloadImage(pixazoImageUrl),
   );
 
   const s3Key = buildS3ImageKey(input.imageCacheKey);
-
-  await log.timed('S3 PutObject - image upload', () =>
-    s3.send(
-      new PutObjectCommand({
-        Bucket: Resource.UweatherImages.name,
-        Key: s3Key,
-        Body: imageBuffer,
-        ContentType: contentType,
-        CacheControl: 'public, max-age=86400', // 24-hour browser cache
-      }),
-    ),
+  const imageUrl = await log.timed('S3 PutObject - image upload', () =>
+    uploadToS3(s3Key, imageBuffer, contentType),
   );
-
-  // Build the CloudFront URL from the CDN domain
-  const imageUrl = `${Resource.ImagesCdn.url}/${s3Key}`;
 
   log.info('Image generated and uploaded', {
     city: input.city,

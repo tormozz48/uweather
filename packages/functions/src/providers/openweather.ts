@@ -1,5 +1,14 @@
 import { createLogger, normalizeCity } from '@uweather/core';
-import type { UnifiedWeatherData } from '@uweather/core';
+import type { ProviderInput, ProviderOutput } from '@uweather/core';
+import { Resource } from 'sst';
+import { weatherCacheService } from '../services/index.js';
+import { fetchOpenWeather } from './openweather.client.js';
+
+export type { ProviderInput, ProviderOutput };
+
+const PROVIDER_NAME = 'openweather';
+const log = createLogger({ function: `provider-${PROVIDER_NAME}` });
+
 /**
  * OpenWeatherMap provider Lambda.
  *
@@ -8,33 +17,15 @@ import type { UnifiedWeatherData } from '@uweather/core';
  *
  * Throws on any failure so Step Functions retry/catch logic engages.
  */
-import { Resource } from 'sst';
-import { weatherCacheService } from '../services/index.js';
-import { fetchOpenWeather } from './openweather.client.js';
-
-const log = createLogger({ function: 'provider-openweather' });
-
-export interface ProviderInput {
-  city: string; // Already normalized by orchestrator
-  language: string;
-  date: string; // YYYY-MM-DD
-}
-
-export interface ProviderOutput {
-  provider: 'openweather';
-  success: true;
-  data: UnifiedWeatherData;
-}
-
-export async function handler(input: ProviderInput): Promise<ProviderOutput> {
+export async function handler(input: ProviderInput): Promise<ProviderOutput<typeof PROVIDER_NAME>> {
   const { city, date } = input;
   log.info('Fetching weather from OpenWeatherMap', { city });
 
   const data = await fetchOpenWeather(city, Resource.OpenWeatherApiKey.value);
 
   const cityNormalized = normalizeCity(city);
-  await weatherCacheService.save(cityNormalized, date, 'openweather', data);
+  await weatherCacheService.save(cityNormalized, date, PROVIDER_NAME, data);
 
-  log.info('Weather cached', { city: cityNormalized, provider: 'openweather', date });
-  return { provider: 'openweather', success: true, data };
+  log.info('Weather cached', { city: cityNormalized, provider: PROVIDER_NAME, date });
+  return { provider: PROVIDER_NAME, success: true, data };
 }

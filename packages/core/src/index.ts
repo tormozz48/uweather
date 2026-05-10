@@ -10,6 +10,9 @@ export type {
   UserProfile,
   WeatherCacheEntry,
   ImageCacheEntry,
+  WeatherProvider,
+  ProviderInput,
+  ProviderOutput,
 } from './types/index.js';
 
 export {

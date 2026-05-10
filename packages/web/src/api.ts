@@ -44,7 +44,7 @@ async function apiFetch<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function getForecast(
+export function getForecast(
   city: string,
   lang: string,
   userId: string,
@@ -53,7 +53,7 @@ export async function getForecast(
   return apiFetch<ForecastResponse>(`/forecast?${params}`);
 }
 
-export async function getHistory(userId: string, limit = 10): Promise<HistoryResponse> {
+export function getHistory(userId: string, limit = 10): Promise<HistoryResponse> {
   const params = new URLSearchParams({ userId, limit: String(limit) });
   return apiFetch<HistoryResponse>(`/history?${params}`);
 }

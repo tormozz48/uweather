@@ -39,7 +39,7 @@ export function toForecastResponse(forecast: ForecastResult): ForecastResponse {
 }
 
 /** Fetch a complete ForecastResult from DynamoDB by forecastId. */
-export async function fetchForecastById(forecastId: string): Promise<ForecastResult> {
+export function fetchForecastById(forecastId: string): Promise<ForecastResult> {
   return forecastService.getById(forecastId);
 }
 

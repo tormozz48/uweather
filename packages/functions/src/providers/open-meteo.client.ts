@@ -1,8 +1,3 @@
-/**
- * Open-Meteo HTTP client — pure fetch, no API key, no AWS/SST dependencies.
- * Two-step: geocoding API → forecast API.
- * Used by the Lambda handler and by integration tests.
- */
 import { transformOpenMeteo } from '@uweather/core';
 import type { OMGeocodingResponse, OMWeatherResponse, UnifiedWeatherData } from '@uweather/core';
 
@@ -24,6 +19,11 @@ const CURRENT_PARAMS = [
 
 const DAILY_PARAMS = ['sunrise', 'sunset', 'uv_index_max'].join(',');
 
+/**
+ * Open-Meteo HTTP client — pure fetch, no API key, no AWS/SST dependencies.
+ * Two-step: geocoding API → forecast API.
+ * Used by the Lambda handler and by integration tests.
+ */
 export async function fetchOpenMeteo(city: string): Promise<UnifiedWeatherData> {
   // Step 1: Geocode the city name to lat/lon
   const geoUrl = `${GEOCODING_URL}?name=${encodeURIComponent(city)}&count=1&language=en&format=json`;
