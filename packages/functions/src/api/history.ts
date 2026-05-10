@@ -1,13 +1,3 @@
-/**
- * GET /history?userId={userId}&limit={limit}
- *
- * Returns the last N forecast records for a given userId, ordered newest-first.
- * Queries the UserHistoryIndex GSI on the Forecasts table.
- *
- * Query params:
- *   userId  — required
- *   limit   — optional, 1–50, default 10
- */
 import { createLogger } from '@uweather/core';
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import { forecastService } from '../services/index.js';
@@ -21,6 +11,16 @@ function parseLimit(raw: string | undefined): number {
   return Math.min(50, Math.max(1, Number.isNaN(parsed) ? 10 : parsed));
 }
 
+/**
+ * GET /history?userId={userId}&limit={limit}
+ *
+ * Returns the last N forecast records for a given userId, ordered newest-first.
+ * Queries the UserHistoryIndex GSI on the Forecasts table.
+ *
+ * Query params:
+ *   userId  — required
+ *   limit   — optional, 1–50, default 10
+ */
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const params = event.queryStringParameters ?? {};
   const userId = params.userId?.trim();

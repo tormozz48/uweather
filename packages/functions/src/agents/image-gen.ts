@@ -1,14 +1,3 @@
-/**
- * Agent 3 — Image Generation Lambda.
- *
- * Step Functions task: invoked on an image-cache MISS. Calls the Pixazo AI
- * Stable Diffusion XL v1.0 API (free tier), downloads the resulting image,
- * uploads it to S3, and returns the CloudFront URL plus the image cache key.
- *
- * API reference: https://www.pixazo.ai/models/stable-diffusion
- * Endpoint: POST https://gateway.pixazo.ai/getImage/v1/getSDXLImage
- * Auth header: Ocp-Apim-Subscription-Key
- */
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import {
   buildImageGenNegativePrompt,
@@ -105,6 +94,17 @@ async function uploadToS3(
   return `${Resource.ImagesCdn.url}/${s3Key}`;
 }
 
+/**
+ * Agent 3 — Image Generation Lambda.
+ *
+ * Step Functions task: invoked on an image-cache MISS. Calls the Pixazo AI
+ * Stable Diffusion XL v1.0 API (free tier), downloads the resulting image,
+ * uploads it to S3, and returns the CloudFront URL plus the image cache key.
+ *
+ * API reference: https://www.pixazo.ai/models/stable-diffusion
+ * Endpoint: POST https://gateway.pixazo.ai/getImage/v1/getSDXLImage
+ * Auth header: Ocp-Apim-Subscription-Key
+ */
 export async function handler(input: ImageGenInput): Promise<ImageGenOutput> {
   log.info('Agent3_ImageGen starting', {
     city: input.city,

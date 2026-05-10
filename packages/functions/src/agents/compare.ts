@@ -1,16 +1,3 @@
-/**
- * Agent 1 — Weather Comparison Lambda.
- *
- * Step Functions task: invoked after FetchWeather (fresh fetch) or directly
- * after a cache hit. Accepts raw provider results, calls Bedrock Claude 3.5
- * Haiku to produce a single ConsensusForecast, and returns it along with the
- * list of providers whose data contributed.
- *
- * Input shape accepts both:
- *   - Wrapped provider output: { success: boolean; provider: string; data?: UnifiedWeatherData }
- *     (produced by the Parallel FetchWeather branches)
- *   - Direct UnifiedWeatherData array (produced by the cache-hit path)
- */
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { buildComparePrompt, createLogger } from '@uweather/core';
 import type { ConsensusForecast, UnifiedWeatherData } from '@uweather/core';
@@ -37,6 +24,19 @@ export interface CompareOutput {
   sourcesUsed: ('openweather' | 'weatherapi' | 'open-meteo')[];
 }
 
+/**
+ * Agent 1 — Weather Comparison Lambda.
+ *
+ * Step Functions task: invoked after FetchWeather (fresh fetch) or directly
+ * after a cache hit. Accepts raw provider results, calls Bedrock Claude 3.5
+ * Haiku to produce a single ConsensusForecast, and returns it along with the
+ * list of providers whose data contributed.
+ *
+ * Input shape accepts both:
+ *   - Wrapped provider output: { success: boolean; provider: string; data?: UnifiedWeatherData }
+ *     (produced by the Parallel FetchWeather branches)
+ *   - Direct UnifiedWeatherData array (produced by the cache-hit path)
+ */
 export async function handler(input: CompareInput): Promise<CompareOutput> {
   log.info('Agent1_Compare starting', { city: input.city, date: input.date });
 

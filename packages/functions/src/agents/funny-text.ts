@@ -1,11 +1,3 @@
-/**
- * Agent 2 — Funny Localized Text Lambda.
- *
- * Step Functions task: invoked after Agent 1 (compare). Takes the
- * ConsensusForecast, queries recent forecast history for this city to avoid
- * repetition, then calls Bedrock Claude 3.5 Haiku to generate a 2–3 paragraph
- * humorous weather report in the requested language.
- */
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { buildFunnyTextPrompt, createLogger } from '@uweather/core';
 import type { ConsensusForecast } from '@uweather/core';
@@ -28,6 +20,14 @@ export interface FunnyTextOutput {
   funnyText: string;
 }
 
+/**
+ * Agent 2 — Funny Localized Text Lambda.
+ *
+ * Step Functions task: invoked after Agent 1 (compare). Takes the
+ * ConsensusForecast, queries recent forecast history for this city to avoid
+ * repetition, then calls Bedrock Claude 3.5 Haiku to generate a 2–3 paragraph
+ * humorous weather report in the requested language.
+ */
 export async function handler(input: FunnyTextInput): Promise<FunnyTextOutput> {
   log.info('Agent2_FunnyText starting', { city: input.city, language: input.language });
 

@@ -1,20 +1,3 @@
-/**
- * GET /forecast?city={city}&lang={lang}&userId={userId}
- *
- * Invokes the orchestrator, starts the Step Functions pipeline if needed, polls
- * until complete, then returns the full ForecastResponse JSON.
- *
- * Query params:
- *   city     — required, non-empty
- *   lang     — optional, ISO 639-1, default "en"
- *   userId   — optional, caller-provided session ID; defaults to "anonymous"
- *
- * Polling: the pipeline takes 15–30 s end-to-end (Bedrock + provider fetches).
- * The Lambda polls Step Functions with a 3-second interval up to an 85-second
- * hard timeout; API Gateway HTTP API has a 29-second integration timeout, so
- * the client may receive a 504 before Lambda finishes — the forecast is still
- * stored in DynamoDB and available via /history on the next request.
- */
 import { randomUUID } from 'node:crypto';
 import { DescribeExecutionCommand, SFNClient, StartExecutionCommand } from '@aws-sdk/client-sfn';
 import { createLogger, getCurrentTimeSlot, normalizeCity, toDateString } from '@uweather/core';
@@ -107,6 +90,23 @@ async function pollExecution(executionArn: string, timeoutMs = 85_000): Promise<
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
+/**
+ * GET /forecast?city={city}&lang={lang}&userId={userId}
+ *
+ * Invokes the orchestrator, starts the Step Functions pipeline if needed, polls
+ * until complete, then returns the full ForecastResponse JSON.
+ *
+ * Query params:
+ *   city     — required, non-empty
+ *   lang     — optional, ISO 639-1, default "en"
+ *   userId   — optional, caller-provided session ID; defaults to "anonymous"
+ *
+ * Polling: the pipeline takes 15–30 s end-to-end (Bedrock + provider fetches).
+ * The Lambda polls Step Functions with a 3-second interval up to an 85-second
+ * hard timeout; API Gateway HTTP API has a 29-second integration timeout, so
+ * the client may receive a 504 before Lambda finishes — the forecast is still
+ * stored in DynamoDB and available via /history on the next request.
+ */
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const params = event.queryStringParameters ?? {};
   const city = params.city?.trim();

@@ -1,13 +1,3 @@
-/**
- * CheckImageCache Lambda — Step Functions task.
- *
- * Checks the ImageCacheIndex GSI on the Forecasts table to see if an image
- * already exists for this city+date+timeSlot+condition+tempBucket combination.
- *
- * Returns:
- *   { cacheHit: true,  imageUrl: string, imageCacheKey: string } — skip image gen
- *   { cacheHit: false, imageCacheKey: string }                    — generate image
- */
 import { buildImageCacheKey, createLogger } from '@uweather/core';
 import type { ConsensusForecast, TimeSlot } from '@uweather/core';
 import { forecastService } from '../services/index.js';
@@ -25,6 +15,16 @@ export type CheckImageCacheOutput =
   | { cacheHit: true; imageUrl: string; imageCacheKey: string }
   | { cacheHit: false; imageCacheKey: string };
 
+/**
+ * CheckImageCache Lambda — Step Functions task.
+ *
+ * Checks the ImageCacheIndex GSI on the Forecasts table to see if an image
+ * already exists for this city+date+timeSlot+condition+tempBucket combination.
+ *
+ * Returns:
+ *   { cacheHit: true,  imageUrl: string, imageCacheKey: string } — skip image gen
+ *   { cacheHit: false, imageCacheKey: string }                    — generate image
+ */
 export async function handler(input: CheckImageCacheInput): Promise<CheckImageCacheOutput> {
   const imageCacheKey = buildImageCacheKey({
     city: input.city,

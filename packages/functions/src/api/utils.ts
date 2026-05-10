@@ -1,3 +1,6 @@
+import type { ForecastResponse, ForecastResult } from '@uweather/core';
+import { forecastService } from '../services/index.js';
+
 /**
  * Shared utilities for API Lambda handlers.
  *
@@ -8,8 +11,6 @@
  *  - jsonBadRequest      — 400 JSON response helper
  *  - jsonServerError     — 5xx JSON response helper
  */
-import type { ForecastResponse, ForecastResult } from '@uweather/core';
-import { forecastService } from '../services/index.js';
 
 // ── Data mappers ──────────────────────────────────────────────────────────────
 

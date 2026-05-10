@@ -1,13 +1,3 @@
-/**
- * CheckCache Step Functions task Lambda.
- *
- * First state in the forecast pipeline. Queries WeatherCache for the given city
- * and today's date. Returns cacheHit=true if ≥2 providers have data fetched
- * within the last 30 minutes.
- *
- * If cacheHit=true, the Step Functions Choice state skips FetchWeather and
- * proceeds directly to agents (added in Phase 3).
- */
 import { createLogger, normalizeCity } from '@uweather/core';
 import type { UnifiedWeatherData } from '@uweather/core';
 import { weatherCacheService } from '../services/index.js';
@@ -28,6 +18,16 @@ export interface CheckCacheOutput {
   providers?: UnifiedWeatherData[];
 }
 
+/**
+ * CheckCache Step Functions task Lambda.
+ *
+ * First state in the forecast pipeline. Queries WeatherCache for the given city
+ * and today's date. Returns cacheHit=true if ≥2 providers have data fetched
+ * within the last 30 minutes.
+ *
+ * If cacheHit=true, the Step Functions Choice state skips FetchWeather and
+ * proceeds directly to agents (added in Phase 3).
+ */
 export async function handler(input: CheckCacheInput): Promise<CheckCacheOutput> {
   const { city, date } = input;
   const cityNormalized = normalizeCity(city);
