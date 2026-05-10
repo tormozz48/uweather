@@ -1,9 +1,3 @@
-/**
- * UserService — high-level access to the Users DynamoDB table.
- *
- * Table schema:
- *   PK: USER#{platform}#{platformId}   SK: PROFILE
- */
 import { GetCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import type { UserPlatform, UserProfile } from '@uweather/core';
 import { Resource } from 'sst';
@@ -11,6 +5,12 @@ import { dynamo } from './db-client.js';
 
 type UserUpdates = Partial<Pick<UserProfile, 'language' | 'city' | 'country'>>;
 
+/**
+ * UserService — high-level access to the Users DynamoDB table.
+ *
+ * Table schema:
+ *   PK: USER#{platform}#{platformId}   SK: PROFILE
+ */
 export class UserService {
   private buildPk(platform: UserPlatform, platformId: string | number): string {
     return `USER#${platform}#${platformId}`;

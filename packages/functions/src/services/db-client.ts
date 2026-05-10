@@ -1,3 +1,6 @@
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+
 /**
  * Shared DynamoDB document client singleton.
  *
@@ -5,7 +8,4 @@
  * DynamoDBDocumentClient transparently marshals/unmarshals JS objects to/from
  * DynamoDB's AttributeValue format.
  */
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
-
 export const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));

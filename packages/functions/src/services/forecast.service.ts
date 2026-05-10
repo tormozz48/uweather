@@ -1,3 +1,9 @@
+import { GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import type { ForecastResult } from '@uweather/core';
+import { Resource } from 'sst';
+import { ulid } from 'ulid';
+import { dynamo } from './db-client.js';
+
 /**
  * ForecastService — high-level access to the Forecasts DynamoDB table.
  *
@@ -8,12 +14,6 @@
  *   UserHistoryIndex  — pk=userId,       sk=createdAt  (newest-first history)
  *   ImageCacheIndex   — pk=imageCacheKey, sk=createdAt  (image reuse lookup)
  */
-import { GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
-import type { ForecastResult } from '@uweather/core';
-import { Resource } from 'sst';
-import { ulid } from 'ulid';
-import { dynamo } from './db-client.js';
-
 export class ForecastService {
   /**
    * Fetch a complete forecast by ID.

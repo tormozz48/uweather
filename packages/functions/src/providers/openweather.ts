@@ -24,7 +24,7 @@ export async function handler(input: ProviderInput): Promise<ProviderOutput<type
   const data = await fetchOpenWeather(city, Resource.OpenWeatherApiKey.value);
 
   const cityNormalized = normalizeCity(city);
-  await weatherCacheService.save(cityNormalized, date, PROVIDER_NAME, data);
+  await weatherCacheService.save({ city: cityNormalized, date, provider: PROVIDER_NAME, data });
 
   log.info('Weather cached', { city: cityNormalized, provider: PROVIDER_NAME, date });
   return { provider: PROVIDER_NAME, success: true, data };
