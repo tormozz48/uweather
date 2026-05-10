@@ -13,17 +13,17 @@
  *  - Step Functions Standard Workflow: ForecastPipeline
  *  - CloudWatch Log Group for SFN execution logs              (Phase 5)
  *
- * State machine flow (Phase 3):
+ * State machine flow (Phase 3, optimised):
  *
  *   CheckCache ──► CacheDecision
  *                    ├─(hit)──► NormalizeFromCache (Pass)
  *                    └─(miss)─► FetchWeather (Parallel) ──► NormalizeFromFetch (Pass)
  *                               Both paths ──►
- *   Agent1_Compare ──► Agent2_FunnyText ──► CheckImageCache ──► ImageCacheDecision
- *                                                                  ├─(hit)──► PrepareSaveFromCache (Pass)
- *                                                                  └─(miss)─► Agent3_ImageGen ──► PrepareSaveFromGen (Pass)
- *                                                                  Both paths ──►
- *   SaveForecast ──► PipelineSuccess
+ *   Agent1_Compare ──► ParallelAgents ─┬─► Branch A: Agent2_FunnyText
+ *                                      └─► Branch B: CheckImageCache ──► ImageCacheDecision
+ *                                                                          ├─(hit)──► NormalizeImageFromCache
+ *                                                                          └─(miss)─► Agent3_ImageGen
+ *                      ──► NormalizeParallelResults ──► SaveForecast ──► PipelineSuccess
  */
 import { forecastsTable, imagesBucket, imagesCdn, weatherCacheTable } from './storage.ts';
 
@@ -449,69 +449,97 @@ const smDefinition = $resolve([
           },
           ResultPath: '$.agentCompare',
           Retry: bedrockRetry,
-          Next: 'Agent2_FunnyText',
+          Next: 'ParallelAgents',
         },
 
-        // ── Agent 2: Funny localized text ───────────────────────────────────
-        Agent2_FunnyText: {
-          Type: 'Task',
-          Resource: agent2Arn,
-          Parameters: {
-            'city.$': '$.city',
-            'language.$': '$.language',
-            'date.$': '$.date',
-            'consensus.$': '$.agentCompare.consensus',
-          },
-          ResultPath: '$.agentFunnyText',
-          Retry: bedrockRetry,
-          Next: 'CheckImageCache',
-        },
-
-        // ── Image cache lookup ──────────────────────────────────────────────
-        CheckImageCache: {
-          Type: 'Task',
-          Resource: checkImageCacheArn,
-          Parameters: {
-            'city.$': '$.city',
-            'date.$': '$.date',
-            'timeSlot.$': '$.timeSlot',
-            'consensus.$': '$.agentCompare.consensus',
-          },
-          ResultPath: '$.imageCache',
-          Retry: [{ ErrorEquals: ['States.ALL'], MaxAttempts: 1, IntervalSeconds: 1 }],
-          Next: 'ImageCacheDecision',
-        },
-
-        ImageCacheDecision: {
-          Type: 'Choice',
-          Choices: [
+        // ── Parallel: Agent 2 (funny text) + image pipeline ────────────────
+        //
+        // Both branches consume only Agent1's consensus — no cross-dependency.
+        // Branch A: generate funny localised text (Bedrock)
+        // Branch B: check image cache → generate image on miss (Pixazo)
+        ParallelAgents: {
+          Type: 'Parallel',
+          Branches: [
+            // ── Branch A: Funny text ────────────────────────────────────────
             {
-              Variable: '$.imageCache.cacheHit',
-              BooleanEquals: true,
-              Next: 'PrepareSaveFromCache',
+              StartAt: 'Agent2_FunnyText',
+              States: {
+                Agent2_FunnyText: {
+                  Type: 'Task',
+                  Resource: agent2Arn,
+                  Parameters: {
+                    'city.$': '$.city',
+                    'language.$': '$.language',
+                    'date.$': '$.date',
+                    'consensus.$': '$.agentCompare.consensus',
+                  },
+                  Retry: bedrockRetry,
+                  End: true,
+                },
+              },
+            },
+            // ── Branch B: Image pipeline ────────────────────────────────────
+            {
+              StartAt: 'CheckImageCache',
+              States: {
+                CheckImageCache: {
+                  Type: 'Task',
+                  Resource: checkImageCacheArn,
+                  Parameters: {
+                    'city.$': '$.city',
+                    'date.$': '$.date',
+                    'timeSlot.$': '$.timeSlot',
+                    'consensus.$': '$.agentCompare.consensus',
+                  },
+                  ResultPath: '$.imageCache',
+                  Retry: [{ ErrorEquals: ['States.ALL'], MaxAttempts: 1, IntervalSeconds: 1 }],
+                  Next: 'ImageCacheDecision',
+                },
+                ImageCacheDecision: {
+                  Type: 'Choice',
+                  Choices: [
+                    {
+                      Variable: '$.imageCache.cacheHit',
+                      BooleanEquals: true,
+                      Next: 'NormalizeImageFromCache',
+                    },
+                  ],
+                  Default: 'Agent3_ImageGen',
+                },
+                Agent3_ImageGen: {
+                  Type: 'Task',
+                  Resource: agent3Arn,
+                  Parameters: {
+                    'city.$': '$.city',
+                    'date.$': '$.date',
+                    'timeSlot.$': '$.timeSlot',
+                    'consensus.$': '$.agentCompare.consensus',
+                    'imageCacheKey.$': '$.imageCache.imageCacheKey',
+                  },
+                  Retry: httpRetry,
+                  End: true,
+                },
+                // On cache hit, extract just imageUrl + imageCacheKey so the
+                // branch output shape matches the Agent3_ImageGen output shape.
+                NormalizeImageFromCache: {
+                  Type: 'Pass',
+                  Parameters: {
+                    'imageUrl.$': '$.imageCache.imageUrl',
+                    'imageCacheKey.$': '$.imageCache.imageCacheKey',
+                  },
+                  End: true,
+                },
+              },
             },
           ],
-          Default: 'Agent3_ImageGen',
+          ResultPath: '$.parallelResults',
+          Next: 'NormalizeParallelResults',
         },
 
-        // ── Agent 3: Image generation (cache miss only) ─────────────────────
-        Agent3_ImageGen: {
-          Type: 'Task',
-          Resource: agent3Arn,
-          Parameters: {
-            'city.$': '$.city',
-            'date.$': '$.date',
-            'timeSlot.$': '$.timeSlot',
-            'consensus.$': '$.agentCompare.consensus',
-            'imageCacheKey.$': '$.imageCache.imageCacheKey',
-          },
-          ResultPath: '$.generatedImage',
-          Retry: httpRetry,
-          Next: 'PrepareSaveFromGen',
-        },
-
-        // Normalise inputs for SaveForecast — image from Pixazo generation
-        PrepareSaveFromGen: {
+        // Merge parallel branch outputs into a flat shape for SaveForecast.
+        // parallelResults[0] = { funnyText }  (Branch A)
+        // parallelResults[1] = { imageUrl, imageCacheKey }  (Branch B)
+        NormalizeParallelResults: {
           Type: 'Pass',
           Parameters: {
             'city.$': '$.city',
@@ -520,27 +548,9 @@ const smDefinition = $resolve([
             'userId.$': '$.userId',
             'timeSlot.$': '$.timeSlot',
             'consensus.$': '$.agentCompare.consensus',
-            'funnyText.$': '$.agentFunnyText.funnyText',
-            'imageUrl.$': '$.generatedImage.imageUrl',
-            'imageCacheKey.$': '$.generatedImage.imageCacheKey',
-            'sourcesUsed.$': '$.agentCompare.sourcesUsed',
-          },
-          Next: 'SaveForecast',
-        },
-
-        // Normalise inputs for SaveForecast — image reused from cache
-        PrepareSaveFromCache: {
-          Type: 'Pass',
-          Parameters: {
-            'city.$': '$.city',
-            'language.$': '$.language',
-            'date.$': '$.date',
-            'userId.$': '$.userId',
-            'timeSlot.$': '$.timeSlot',
-            'consensus.$': '$.agentCompare.consensus',
-            'funnyText.$': '$.agentFunnyText.funnyText',
-            'imageUrl.$': '$.imageCache.imageUrl',
-            'imageCacheKey.$': '$.imageCache.imageCacheKey',
+            'funnyText.$': '$.parallelResults[0].funnyText',
+            'imageUrl.$': '$.parallelResults[1].imageUrl',
+            'imageCacheKey.$': '$.parallelResults[1].imageCacheKey',
             'sourcesUsed.$': '$.agentCompare.sourcesUsed',
           },
           Next: 'SaveForecast',
