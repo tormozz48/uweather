@@ -58,6 +58,10 @@ declare module "sst" {
       "type": "sst.sst.Secret"
       "value": string
     }
+    "ResolveLandmarkFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
     "SaveForecastFn": {
       "name": string
       "type": "sst.aws.Function"

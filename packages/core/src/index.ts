@@ -54,10 +54,12 @@ export {
   buildFunnyTextPrompt,
   buildImageGenPrompt,
   buildImageGenNegativePrompt,
+  buildResolveLandmarkPrompt,
 } from './prompts/index.js';
 
 export type {
   ComparePromptParams,
   FunnyTextPromptParams,
   ImageGenPromptParams,
+  ResolveLandmarkPromptParams,
 } from './prompts/index.js';

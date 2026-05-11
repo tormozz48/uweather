@@ -22,6 +22,8 @@ export interface ImageGenInput {
   consensus: ConsensusForecast;
   /** Pre-computed cache key from CheckImageCache — reused to name the S3 object */
   imageCacheKey: string;
+  /** Landmark resolved by the ResolveLandmark pipeline step. */
+  landmark: string;
 }
 
 export interface ImageGenOutput {
@@ -123,6 +125,7 @@ export async function handler(input: ImageGenInput, context: Context): Promise<I
     consensus: input.consensus,
     city: input.city,
     timeSlot: input.timeSlot,
+    landmark: input.landmark,
   });
   const negativePrompt = buildImageGenNegativePrompt();
 

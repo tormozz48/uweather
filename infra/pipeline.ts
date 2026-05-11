@@ -6,8 +6,8 @@
  *  - SST Secrets: OpenWeatherApiKey, WeatherApiKey
  *  - Lambda functions:
  *      CheckCacheFn, OpenWeatherFn, WeatherApiFn, OpenMeteoFn   (Phase 2)
- *      Agent1CompareFn, Agent2FunnyTextFn, CheckImageCacheFn    (Phase 3)
- *      Agent3ImageGenFn, SaveForecastFn                         (Phase 3)
+ *      Agent1CompareFn, ResolveLandmarkFn, Agent2FunnyTextFn,    (Phase 3)
+ *      CheckImageCacheFn, Agent3ImageGenFn, SaveForecastFn      (Phase 3)
  *      OrchestratorFn                                           (Phase 2, updated)
  *  - IAM execution role for Step Functions
  *  - Step Functions Standard Workflow: ForecastPipeline
@@ -19,8 +19,8 @@
  *                    ├─(hit)──► NormalizeFromCache (Pass)
  *                    └─(miss)─► FetchWeather (Parallel) ──► NormalizeFromFetch (Pass)
  *                               Both paths ──►
- *   Agent1_Compare ──► ParallelAgents ─┬─► Branch A: Agent2_FunnyText
- *                                      └─► Branch B: CheckImageCache ──► ImageCacheDecision
+ *   Agent1_Compare ──► ResolveLandmark ──► ParallelAgents ─┬─► Branch A: Agent2_FunnyText
+ *                                                         └─► Branch B: CheckImageCache ──► ImageCacheDecision
  *                                                                          ├─(hit)──► NormalizeImageFromCache
  *                                                                          └─(miss)─► Agent3_ImageGen
  *                      ──► NormalizeParallelResults ──► SaveForecast ──► PipelineSuccess
@@ -144,6 +144,15 @@ const agent3ImageGenFunction = new sst.aws.Function('Agent3ImageGenFn', {
   transform: xrayTransform,
 });
 
+const resolveLandmarkFunction = new sst.aws.Function('ResolveLandmarkFn', {
+  handler: 'packages/functions/src/agents/resolve-landmark.handler',
+  timeout: '30 seconds',
+  memory: '256 MB',
+  // Bedrock access via IAM role (fallback only) — no resource link needed
+  permissions: xrayPermissions,
+  transform: xrayTransform,
+});
+
 const saveForecastFunction = new sst.aws.Function('SaveForecastFn', {
   handler: 'packages/functions/src/save-forecast.handler',
   link: [forecastsTable],
@@ -196,6 +205,11 @@ new aws.iam.RolePolicy('Agent2BedrockPolicy', {
   policy: bedrockTextPolicy,
 });
 
+new aws.iam.RolePolicy('ResolveLandmarkBedrockPolicy', {
+  role: resolveLandmarkFunction.nodes.role.id,
+  policy: bedrockTextPolicy,
+});
+
 // ── Step Functions IAM role ───────────────────────────────────────────────────
 
 const sfRole = new aws.iam.Role('StepFunctionsRole', {
@@ -228,6 +242,7 @@ new aws.iam.RolePolicy('StepFunctionsInvokePolicy', {
           openMeteoFunction.arn,
           agent1CompareFunction.arn,
           agent2FunnyTextFunction.arn,
+          resolveLandmarkFunction.arn,
           checkImageCacheFunction.arn,
           agent3ImageGenFunction.arn,
           saveForecastFunction.arn,
@@ -353,6 +368,7 @@ const smDefinition = $resolve([
   weatherApiFunction.arn,
   openMeteoFunction.arn,
   agent1CompareFunction.arn,
+  resolveLandmarkFunction.arn,
   agent2FunnyTextFunction.arn,
   checkImageCacheFunction.arn,
   agent3ImageGenFunction.arn,
@@ -364,6 +380,7 @@ const smDefinition = $resolve([
     weatherApiArn,
     openMeteoArn,
     agent1Arn,
+    resolveLandmarkArn,
     agent2Arn,
     checkImageCacheArn,
     agent3Arn,
@@ -448,12 +465,52 @@ const smDefinition = $resolve([
           },
           ResultPath: '$.agentCompare',
           Retry: bedrockRetry,
+          Next: 'ResolveLandmark',
+        },
+
+        // ── Resolve landmark ───────────────────────────────────────────────
+        //
+        // Dynamically resolves a random landmark for the city.
+        // Primary: Wikidata SPARQL (free). Fallback: Bedrock Haiku.
+        ResolveLandmark: {
+          Type: 'Task',
+          Resource: resolveLandmarkArn,
+          Parameters: {
+            'city.$': '$.city',
+          },
+          ResultPath: '$.landmarkResult',
+          Retry: [
+            {
+              ErrorEquals: ['States.ALL'],
+              MaxAttempts: 1,
+              IntervalSeconds: 2,
+            },
+          ],
+          Catch: [
+            {
+              ErrorEquals: ['States.ALL'],
+              ResultPath: '$.landmarkResult',
+              Next: 'LandmarkFallback',
+            },
+          ],
+          Next: 'ParallelAgents',
+        },
+
+        // If ResolveLandmark fails entirely, use a generic fallback
+        LandmarkFallback: {
+          Type: 'Pass',
+          Parameters: {
+            'landmark.$': "States.Format('the most iconic landmark of {}', $.city)",
+            landmarksList: [],
+            source: 'fallback',
+          },
+          ResultPath: '$.landmarkResult',
           Next: 'ParallelAgents',
         },
 
         // ── Parallel: Agent 2 (funny text) + image pipeline ────────────────
         //
-        // Both branches consume only Agent1's consensus — no cross-dependency.
+        // Both branches consume Agent1's consensus + resolved landmark.
         // Branch A: generate funny localised text (Bedrock)
         // Branch B: check image cache → generate image on miss (Pixazo)
         ParallelAgents: {
@@ -471,6 +528,7 @@ const smDefinition = $resolve([
                     'language.$': '$.language',
                     'date.$': '$.date',
                     'consensus.$': '$.agentCompare.consensus',
+                    'landmark.$': '$.landmarkResult.landmark',
                   },
                   Retry: bedrockRetry,
                   End: true,
@@ -514,6 +572,7 @@ const smDefinition = $resolve([
                     'timeSlot.$': '$.timeSlot',
                     'consensus.$': '$.agentCompare.consensus',
                     'imageCacheKey.$': '$.imageCache.imageCacheKey',
+                    'landmark.$': '$.landmarkResult.landmark',
                   },
                   Retry: httpRetry,
                   End: true,

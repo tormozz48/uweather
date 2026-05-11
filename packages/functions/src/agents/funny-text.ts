@@ -15,6 +15,8 @@ export interface FunnyTextInput {
   language: string;
   date: string;
   consensus: ConsensusForecast;
+  /** Landmark resolved by the ResolveLandmark pipeline step. */
+  landmark: string;
 }
 
 export interface FunnyTextOutput {
@@ -45,6 +47,7 @@ export async function handler(input: FunnyTextInput, context: Context): Promise<
     consensus: input.consensus,
     city: input.city,
     language: input.language,
+    landmark: input.landmark,
     recentHistory,
   });
 

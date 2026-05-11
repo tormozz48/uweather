@@ -10,6 +10,8 @@ export interface FunnyTextPromptParams {
   consensus: ConsensusForecast;
   city: string;
   language: string;
+  /** Landmark resolved by the ResolveLandmark pipeline step. */
+  landmark: string;
   /** Last 5 funnyText values for this city — avoid repeating themes/landmarks */
   recentHistory?: string[];
 }
@@ -29,7 +31,8 @@ export function buildFunnyTextPrompt(params: FunnyTextPromptParams): {
 
 Style guidelines:
 - Friendly, witty, and genuinely informative tone
-- Reference real local landmarks, cultural quirks, or seasonal context for the city
+- You MUST reference this specific landmark: "${params.landmark}" — weave it naturally into your text
+- Also reference cultural quirks or seasonal context for the city
 - Include practical recommendations (what to wear, whether to carry an umbrella, etc.)
 - Write exactly 2–3 paragraphs, conversational style
 - Avoid weather clichés ("April showers", "under the weather", etc.)
