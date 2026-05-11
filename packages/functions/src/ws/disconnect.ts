@@ -11,9 +11,9 @@ import type { APIGatewayProxyResultV2, APIGatewayProxyWebsocketEventV2 } from 'a
 
 const log = createLogger({ function: 'ws-disconnect' });
 
-export async function handler(
+export function handler(
   event: APIGatewayProxyWebsocketEventV2,
-): Promise<APIGatewayProxyResultV2> {
+): APIGatewayProxyResultV2 {
   const connectionId = event.requestContext.connectionId;
   log.info('WebSocket disconnected', { connectionId });
 

@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
+import { type FormEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { useCitySearch } from '../hooks/useCitySearch.js';
 import { LANGUAGES } from '../constants/weather.js';
 
@@ -62,7 +62,7 @@ export function SearchForm({
     inputRef.current?.focus();
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (!isOpen || suggestions.length === 0) return;
 
     switch (e.key) {
@@ -119,19 +119,21 @@ export function SearchForm({
           )}
 
           {isOpen && suggestions.length > 0 && (
-            <ul
+            <div
               className="city-autocomplete__dropdown"
               id={listboxId}
               role="listbox"
               aria-label="City suggestions"
+              tabIndex={-1}
             >
               {suggestions.map((s, i) => (
-                <li
+                <div
                   key={s.id}
                   id={`${listboxId}-option-${i}`}
                   className={`city-autocomplete__item${i === activeIndex ? ' city-autocomplete__item--active' : ''}`}
                   role="option"
                   aria-selected={i === activeIndex}
+                  tabIndex={-1}
                   onPointerDown={(e) => {
                     // Prevent blur on input before click fires
                     e.preventDefault();
@@ -144,9 +146,9 @@ export function SearchForm({
                       {[s.admin1, s.country].filter(Boolean).join(', ')}
                     </span>
                   )}
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
         </div>
 

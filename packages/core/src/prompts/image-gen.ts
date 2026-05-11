@@ -49,13 +49,7 @@ export function buildImageGenPrompt(params: ImageGenPromptParams): string {
   const conditionDesc = CONDITION_VISUALS[params.consensus.condition];
   const temp = params.consensus.temperature;
 
-  return (
-    `${params.landmark} in ${params.city}, ${conditionDesc}, ${timeDesc}. ` +
-    `Weather: ${params.consensus.conditionDescription}, ${temp}°C. ` +
-    `Semi-realistic cinematic digital painting, detailed architecture, ` +
-    `vivid colours, atmospheric depth, wide landscape composition. ` +
-    `High quality, 8K render, no text, no labels, no watermarks.`
-  );
+  return `${params.landmark} in ${params.city}, ${conditionDesc}, ${timeDesc}. Weather: ${params.consensus.conditionDescription}, ${temp}°C. Semi-realistic cinematic digital painting, detailed architecture, vivid colours, atmospheric depth, wide landscape composition. High quality, 8K render, no text, no labels, no watermarks.`;
 }
 
 export function buildImageGenNegativePrompt(): string {

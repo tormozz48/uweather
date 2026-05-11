@@ -71,6 +71,9 @@
         "rules": {
           "suspicious": {
             "noReactSpecificProps": "off"
+          },
+          "a11y": {
+            "useSemanticElements": "off"
           }
         }
       }
