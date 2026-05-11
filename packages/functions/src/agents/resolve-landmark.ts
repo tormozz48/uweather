@@ -1,6 +1,7 @@
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { buildResolveLandmarkPrompt, createLogger, emitMetric } from '@uweather/core';
 import type { Context } from 'aws-lambda';
+import { reportStage } from '../lib/report-stage.js';
 
 const bedrock = new BedrockRuntimeClient({});
 const log = createLogger({ function: 'resolve-landmark' });
@@ -18,6 +19,7 @@ const MIN_LANDMARKS = 3;
 
 export interface ResolveLandmarkInput {
   city: string;
+  executionArn?: string;
 }
 
 export interface ResolveLandmarkOutput {
@@ -151,6 +153,7 @@ export async function handler(
   context: Context,
 ): Promise<ResolveLandmarkOutput> {
   const reqLog = log.child({ requestId: context.awsRequestId, city: input.city });
+  if (input.executionArn) await reportStage(input.executionArn, 'landmark', 'started');
   reqLog.info('ResolveLandmark starting');
 
   let landmarks: string[] = [];
@@ -196,5 +199,6 @@ export async function handler(
   reqLog.info('Landmark selected', { landmark, source, totalOptions: landmarks.length });
   emitMetric('LandmarkSource', 1, 'Count', { source });
 
+  if (input.executionArn) await reportStage(input.executionArn, 'landmark', 'done');
   return { landmark, landmarksList: landmarks, source };
 }

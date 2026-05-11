@@ -2,6 +2,7 @@ import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedroc
 import { buildComparePrompt, createLogger, emitMetric } from '@uweather/core';
 import type { ConsensusForecast, UnifiedWeatherData } from '@uweather/core';
 import type { Context } from 'aws-lambda';
+import { reportStage } from '../lib/report-stage.js';
 
 const bedrock = new BedrockRuntimeClient({});
 const log = createLogger({ function: 'agent-compare' });
@@ -18,6 +19,7 @@ export interface CompareInput {
   language: string;
   date: string;
   providerResults: ProviderResult[];
+  executionArn?: string;
 }
 
 export interface CompareOutput {
@@ -38,6 +40,7 @@ export interface CompareOutput {
  */
 export async function handler(input: CompareInput, context: Context): Promise<CompareOutput> {
   const reqLog = log.child({ requestId: context.awsRequestId, city: input.city });
+  if (input.executionArn) await reportStage(input.executionArn, 'compare', 'started');
   reqLog.info('Agent1_Compare starting', { date: input.date });
 
   // Normalise — accept both wrapped { success, data } objects and bare UnifiedWeatherData
@@ -153,5 +156,6 @@ export async function handler(input: CompareInput, context: Context): Promise<Co
     bedrockDurationMs,
   });
 
+  if (input.executionArn) await reportStage(input.executionArn, 'compare', 'done');
   return { consensus, sourcesUsed };
 }

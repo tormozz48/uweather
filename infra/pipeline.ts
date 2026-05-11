@@ -68,6 +68,18 @@ const xrayPermissions = [
   },
 ];
 
+// ── EventBridge permissions (for pipeline stage reporting) ───────────────────
+//
+// Each pipeline Lambda emits a custom EventBridge event when it starts/finishes
+// so the WebSocket push Lambda can relay progress to the frontend in real time.
+
+const eventBridgePermissions = [
+  {
+    actions: ['events:PutEvents'],
+    resources: ['*' as const], // default event bus
+  },
+];
+
 // ── Phase 2 Lambda functions ──────────────────────────────────────────────────
 
 const checkCacheFunction = new sst.aws.Function('CheckCacheFn', {
@@ -75,7 +87,7 @@ const checkCacheFunction = new sst.aws.Function('CheckCacheFn', {
   link: [weatherCacheTable],
   timeout: '30 seconds',
   memory: '256 MB',
-  permissions: xrayPermissions,
+  permissions: [...xrayPermissions, ...eventBridgePermissions],
   transform: xrayTransform,
 });
 
@@ -113,7 +125,7 @@ export const agent1CompareFunction = new sst.aws.Function('Agent1CompareFn', {
   timeout: '90 seconds',
   memory: '512 MB',
   // Bedrock access via IAM role — no resource link needed
-  permissions: xrayPermissions,
+  permissions: [...xrayPermissions, ...eventBridgePermissions],
   transform: xrayTransform,
 });
 
@@ -122,7 +134,7 @@ export const agent2FunnyTextFunction = new sst.aws.Function('Agent2FunnyTextFn',
   link: [forecastsTable],
   timeout: '90 seconds',
   memory: '512 MB',
-  permissions: xrayPermissions,
+  permissions: [...xrayPermissions, ...eventBridgePermissions],
   transform: xrayTransform,
 });
 
@@ -131,7 +143,7 @@ const checkImageCacheFunction = new sst.aws.Function('CheckImageCacheFn', {
   link: [forecastsTable],
   timeout: '30 seconds',
   memory: '256 MB',
-  permissions: xrayPermissions,
+  permissions: [...xrayPermissions, ...eventBridgePermissions],
   transform: xrayTransform,
 });
 
@@ -140,7 +152,7 @@ const agent3ImageGenFunction = new sst.aws.Function('Agent3ImageGenFn', {
   link: [imagesBucket, imagesCdn, pixazoApiKey],
   timeout: '90 seconds',
   memory: '512 MB',
-  permissions: xrayPermissions,
+  permissions: [...xrayPermissions, ...eventBridgePermissions],
   transform: xrayTransform,
 });
 
@@ -149,7 +161,7 @@ const resolveLandmarkFunction = new sst.aws.Function('ResolveLandmarkFn', {
   timeout: '30 seconds',
   memory: '256 MB',
   // Bedrock access via IAM role (fallback only) — no resource link needed
-  permissions: xrayPermissions,
+  permissions: [...xrayPermissions, ...eventBridgePermissions],
   transform: xrayTransform,
 });
 
@@ -158,7 +170,7 @@ const saveForecastFunction = new sst.aws.Function('SaveForecastFn', {
   link: [forecastsTable],
   timeout: '30 seconds',
   memory: '256 MB',
-  permissions: xrayPermissions,
+  permissions: [...xrayPermissions, ...eventBridgePermissions],
   transform: xrayTransform,
 });
 
@@ -395,6 +407,12 @@ const smDefinition = $resolve([
         CheckCache: {
           Type: 'Task',
           Resource: checkCacheArn,
+          Parameters: {
+            'city.$': '$.city',
+            'language.$': '$.language',
+            'date.$': '$.date',
+            'executionArn.$': '$$.Execution.Id',
+          },
           ResultPath: '$.cacheCheck',
           Retry: [{ ErrorEquals: ['States.ALL'], MaxAttempts: 1, IntervalSeconds: 1 }],
           Catch: [{ ErrorEquals: ['States.ALL'], ResultPath: null, Next: 'FetchWeather' }],
@@ -462,6 +480,7 @@ const smDefinition = $resolve([
             'language.$': '$.language',
             'date.$': '$.date',
             'providerResults.$': '$.providerResults',
+            'executionArn.$': '$$.Execution.Id',
           },
           ResultPath: '$.agentCompare',
           Retry: bedrockRetry,
@@ -477,6 +496,7 @@ const smDefinition = $resolve([
           Resource: resolveLandmarkArn,
           Parameters: {
             'city.$': '$.city',
+            'executionArn.$': '$$.Execution.Id',
           },
           ResultPath: '$.landmarkResult',
           Retry: [
@@ -529,6 +549,7 @@ const smDefinition = $resolve([
                     'date.$': '$.date',
                     'consensus.$': '$.agentCompare.consensus',
                     'landmark.$': '$.landmarkResult.landmark',
+                    'executionArn.$': '$$.Execution.Id',
                   },
                   Retry: bedrockRetry,
                   End: true,
@@ -547,6 +568,7 @@ const smDefinition = $resolve([
                     'date.$': '$.date',
                     'timeSlot.$': '$.timeSlot',
                     'consensus.$': '$.agentCompare.consensus',
+                    'executionArn.$': '$$.Execution.Id',
                   },
                   ResultPath: '$.imageCache',
                   Retry: [{ ErrorEquals: ['States.ALL'], MaxAttempts: 1, IntervalSeconds: 1 }],
@@ -573,6 +595,7 @@ const smDefinition = $resolve([
                     'consensus.$': '$.agentCompare.consensus',
                     'imageCacheKey.$': '$.imageCache.imageCacheKey',
                     'landmark.$': '$.landmarkResult.landmark',
+                    'executionArn.$': '$$.Execution.Id',
                   },
                   Retry: httpRetry,
                   End: true,
@@ -618,6 +641,19 @@ const smDefinition = $resolve([
         SaveForecast: {
           Type: 'Task',
           Resource: saveForecastArn,
+          Parameters: {
+            'city.$': '$.city',
+            'language.$': '$.language',
+            'date.$': '$.date',
+            'userId.$': '$.userId',
+            'timeSlot.$': '$.timeSlot',
+            'consensus.$': '$.consensus',
+            'funnyText.$': '$.funnyText',
+            'imageUrl.$': '$.imageUrl',
+            'imageCacheKey.$': '$.imageCacheKey',
+            'sourcesUsed.$': '$.sourcesUsed',
+            'executionArn.$': '$$.Execution.Id',
+          },
           Retry: [{ ErrorEquals: ['States.ALL'], MaxAttempts: 2, IntervalSeconds: 2 }],
           Next: 'PipelineSuccess',
         },

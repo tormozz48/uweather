@@ -9,6 +9,7 @@ import {
 import type { ConsensusForecast, TimeSlot } from '@uweather/core';
 import type { Context } from 'aws-lambda';
 import { Resource } from 'sst';
+import { reportStage } from '../lib/report-stage.js';
 
 const s3 = new S3Client({});
 const log = createLogger({ function: 'agent-image-gen' });
@@ -24,6 +25,7 @@ export interface ImageGenInput {
   imageCacheKey: string;
   /** Landmark resolved by the ResolveLandmark pipeline step. */
   landmark: string;
+  executionArn?: string;
 }
 
 export interface ImageGenOutput {
@@ -116,6 +118,7 @@ export async function handler(input: ImageGenInput, context: Context): Promise<I
     imageCacheKey: input.imageCacheKey,
   });
 
+  if (input.executionArn) await reportStage(input.executionArn, 'image_gen', 'started');
   reqLog.info('Agent3_ImageGen starting', {
     timeSlot: input.timeSlot,
     condition: input.consensus.condition,
@@ -148,5 +151,6 @@ export async function handler(input: ImageGenInput, context: Context): Promise<I
   // Track image generation count for cost monitoring
   emitMetric('ImageGenerationCount', 1);
 
+  if (input.executionArn) await reportStage(input.executionArn, 'image_gen', 'done');
   return { imageUrl, imageCacheKey: input.imageCacheKey };
 }

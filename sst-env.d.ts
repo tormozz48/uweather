@@ -90,6 +90,22 @@ declare module "sst" {
       "type": "sst.aws.StaticSite"
       "url": string
     }
+    "WebSocketConnections": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
+    "WsConnectFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "WsDisconnectFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "WsPushStageFn": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
   }
 }
 /// <reference path="sst-env.d.ts" />

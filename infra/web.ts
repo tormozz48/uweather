@@ -9,6 +9,7 @@
  * (e.g. /history) return 200 instead of 403/404 from CloudFront.
  */
 import { api } from './api.ts';
+import { wsUrl } from './realtime.ts';
 
 export const web = new sst.aws.StaticSite('Web', {
   path: 'packages/web',
@@ -18,9 +19,10 @@ export const web = new sst.aws.StaticSite('Web', {
     output: 'dist',
   },
 
-  // Inject API base URL at build time — consumed as import.meta.env.VITE_API_URL
+  // Inject API + WebSocket URLs at build time
   environment: {
     VITE_API_URL: api.url,
+    VITE_WS_URL: wsUrl,
   },
 
   // SPA routing: serve index.html on all 403/404 responses (client-side router handles the path)

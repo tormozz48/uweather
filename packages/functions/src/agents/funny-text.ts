@@ -2,6 +2,7 @@ import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedroc
 import { buildFunnyTextPrompt, createLogger, emitMetric } from '@uweather/core';
 import type { ConsensusForecast } from '@uweather/core';
 import type { Context } from 'aws-lambda';
+import { reportStage } from '../lib/report-stage.js';
 import { forecastService } from '../services/index.js';
 
 const bedrock = new BedrockRuntimeClient({});
@@ -17,6 +18,7 @@ export interface FunnyTextInput {
   consensus: ConsensusForecast;
   /** Landmark resolved by the ResolveLandmark pipeline step. */
   landmark: string;
+  executionArn?: string;
 }
 
 export interface FunnyTextOutput {
@@ -37,6 +39,7 @@ export async function handler(input: FunnyTextInput, context: Context): Promise<
     city: input.city,
     language: input.language,
   });
+  if (input.executionArn) await reportStage(input.executionArn, 'text', 'started');
   reqLog.info('Agent2_FunnyText starting');
 
   // Fetch recent history for this city to avoid repetition
@@ -105,6 +108,7 @@ export async function handler(input: FunnyTextInput, context: Context): Promise<
 
   reqLog.info('Funny text generated', { length: funnyText.length, bedrockDurationMs });
 
+  if (input.executionArn) await reportStage(input.executionArn, 'text', 'done');
   return { funnyText };
 }
 

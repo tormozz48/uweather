@@ -1,17 +1,18 @@
-import { type FormEvent, useCallback, useEffect, useState } from 'react';
-import { getForecast, getHistory } from './api.js';
+import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { getHistory, pollForecastResult, startForecast } from './api.js';
 import type { ForecastResponse } from './api.js';
 import { ErrorCard } from './components/ErrorCard.js';
 import { ForecastSection } from './components/ForecastSection.js';
 import { HistoryList } from './components/HistoryList.js';
-import { LoadingSection } from './components/LoadingSection.js';
+import { PipelineProgress } from './components/PipelineProgress.js';
 import { SearchForm } from './components/SearchForm.js';
 import type { CityCoords } from './components/SearchForm.js';
+import { usePipelineProgress } from './hooks/usePipelineProgress.js';
 import { getSessionId } from './lib/session.js';
 
 type AppState =
   | { status: 'idle' }
-  | { status: 'loading' }
+  | { status: 'loading'; executionArn: string }
   | { status: 'success'; forecast: ForecastResponse }
   | { status: 'error'; message: string };
 
@@ -23,6 +24,10 @@ export function App() {
   const [history, setHistory] = useState<ForecastResponse[]>([]);
   const sessionId = getSessionId();
 
+  // WebSocket pipeline progress — active only during loading
+  const executionArn = state.status === 'loading' ? state.executionArn : null;
+  const progress = usePipelineProgress(executionArn);
+
   // Load history on mount
   useEffect(() => {
     getHistory(sessionId, 5)
@@ -31,6 +36,40 @@ export function App() {
         // History is best-effort — silently ignore errors
       });
   }, [sessionId]);
+
+  // When pipeline completes via WebSocket, fetch the result
+  const fetchingResultRef = useRef(false);
+  useEffect(() => {
+    if (!progress.completed || state.status !== 'loading') return;
+    if (fetchingResultRef.current) return; // prevent double-fire
+    fetchingResultRef.current = true;
+
+    if (progress.succeeded) {
+      pollForecastResult(state.executionArn)
+        .then((forecast) => {
+          setState({ status: 'success', forecast });
+          setHistory((prev) => {
+            const filtered = prev.filter((f) => f.forecastId !== forecast.forecastId);
+            return [forecast, ...filtered].slice(0, 10);
+          });
+        })
+        .catch((err) => {
+          setState({
+            status: 'error',
+            message: err instanceof Error ? err.message : 'Something went wrong.',
+          });
+        })
+        .finally(() => {
+          fetchingResultRef.current = false;
+        });
+    } else {
+      fetchingResultRef.current = false;
+      setState({
+        status: 'error',
+        message: 'Forecast pipeline failed — please try again.',
+      });
+    }
+  }, [progress.completed, progress.succeeded, state]);
 
   const handleCityChange = useCallback((value: string, newCoords?: CityCoords) => {
     setCity(value);
@@ -43,17 +82,21 @@ export function App() {
       const trimmed = city.trim();
       if (!trimmed || state.status === 'loading') return;
 
-      setState({ status: 'loading' });
-
       try {
-        const forecast = await getForecast(trimmed, lang, sessionId, coords);
-        setState({ status: 'success', forecast });
+        // Start the pipeline — get executionArn for WebSocket tracking
+        const arn = await startForecast(trimmed, lang, sessionId, coords);
+        setState({ status: 'loading', executionArn: arn });
 
-        // Prepend to local history (avoid duplicates by forecastId)
-        setHistory((prev) => {
-          const filtered = prev.filter((f) => f.forecastId !== forecast.forecastId);
-          return [forecast, ...filtered].slice(0, 10);
-        });
+        // If WebSocket is not available, fall back to REST polling immediately
+        if (!import.meta.env.VITE_WS_URL) {
+          const forecast = await pollForecastResult(arn);
+          setState({ status: 'success', forecast });
+          setHistory((prev) => {
+            const filtered = prev.filter((f) => f.forecastId !== forecast.forecastId);
+            return [forecast, ...filtered].slice(0, 10);
+          });
+        }
+        // With WebSocket, the completion useEffect handles the result fetch
       } catch (err) {
         setState({
           status: 'error',
@@ -91,7 +134,9 @@ export function App() {
           onSubmit={handleSubmit}
         />
 
-        {state.status === 'loading' && <LoadingSection />}
+        {state.status === 'loading' && (
+          <PipelineProgress stages={progress.stages} connected={progress.connected} />
+        )}
 
         {state.status === 'error' && <ErrorCard message={state.message} onRetry={handleRetry} />}
 

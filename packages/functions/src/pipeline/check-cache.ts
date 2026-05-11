@@ -1,6 +1,7 @@
 import { createLogger, emitMetric, normalizeCity } from '@uweather/core';
 import type { UnifiedWeatherData } from '@uweather/core';
 import type { Context } from 'aws-lambda';
+import { reportStage } from '../lib/report-stage.js';
 import { weatherCacheService } from '../services/index.js';
 
 const log = createLogger({ function: 'pipeline-check-cache' });
@@ -11,6 +12,7 @@ export interface CheckCacheInput {
   city: string;
   language: string;
   date: string; // YYYY-MM-DD
+  executionArn?: string;
 }
 
 export interface CheckCacheOutput {
@@ -31,7 +33,8 @@ export interface CheckCacheOutput {
  */
 export async function handler(input: CheckCacheInput, context: Context): Promise<CheckCacheOutput> {
   const reqLog = log.child({ requestId: context.awsRequestId, city: input.city });
-  const { city, date } = input;
+  const { city, date, executionArn } = input;
+  if (executionArn) await reportStage(executionArn, 'cache', 'started');
   const cityNormalized = normalizeCity(city);
 
   reqLog.info('Checking WeatherCache', { city: cityNormalized, date });
@@ -53,6 +56,8 @@ export async function handler(input: CheckCacheInput, context: Context): Promise
 
   // Emit custom metric for cache hit rate tracking
   emitMetric(cacheHit ? 'WeatherCacheHit' : 'WeatherCacheMiss', 1);
+
+  if (executionArn) await reportStage(executionArn, 'cache', 'done');
 
   if (cacheHit) {
     return { cacheHit: true, providers: freshProviders };

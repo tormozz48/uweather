@@ -294,6 +294,223 @@ body {
   font-size: 0.85rem;
 }
 
+/* ── Pipeline progress ────────────────────────────────────────────────────── */
+
+.pipeline-progress {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: fadeIn 0.3s ease;
+}
+
+.pipeline-progress__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pipeline-progress__title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.pipeline-progress__live {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #22c55e;
+  animation: pulse-opacity 2s ease-in-out infinite;
+}
+
+@keyframes pulse-opacity {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.pipeline-progress__diagram {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.pipeline-progress__row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.pipeline-progress__step {
+  display: flex;
+  align-items: center;
+}
+
+/* ── Stage node ───────────────────────────────────────────────────────────── */
+
+.pipeline-stage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  transition: all 0.4s ease;
+  position: relative;
+  min-width: 90px;
+  justify-content: center;
+}
+
+.pipeline-stage--pending {
+  opacity: 0.4;
+}
+
+.pipeline-stage--active {
+  border-color: var(--color-primary);
+  background: rgba(79, 142, 247, 0.1);
+  opacity: 1;
+  box-shadow: 0 0 12px rgba(79, 142, 247, 0.2);
+}
+
+.pipeline-stage--done {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.08);
+  opacity: 1;
+}
+
+.pipeline-stage__icon {
+  font-size: 1rem;
+}
+
+.pipeline-stage__label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.pipeline-stage__check {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #22c55e;
+  margin-left: 2px;
+}
+
+.pipeline-stage__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.6); }
+}
+
+/* ── Connector ────────────────────────────────────────────────────────────── */
+
+.pipeline-connector {
+  display: flex;
+  align-items: center;
+  width: 24px;
+  position: relative;
+}
+
+.pipeline-connector__line {
+  height: 2px;
+  flex: 1;
+  background: var(--color-border);
+  transition: background 0.4s ease;
+}
+
+.pipeline-connector--done .pipeline-connector__line {
+  background: #22c55e;
+}
+
+.pipeline-connector__arrow {
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 6px solid var(--color-border);
+  transition: border-left-color 0.4s ease;
+}
+
+.pipeline-connector--done .pipeline-connector__arrow {
+  border-left-color: #22c55e;
+}
+
+/* ── Parallel connector (vertical) ────────────────────────────────────────── */
+
+.pipeline-progress__parallel-connector {
+  display: flex;
+  justify-content: center;
+  transform: rotate(90deg);
+}
+
+/* ── Parallel section ─────────────────────────────────────────────────────── */
+
+.pipeline-progress__parallel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+}
+
+.pipeline-progress__parallel-bracket {
+  width: 3px;
+  height: 100%;
+  min-height: 40px;
+  background: var(--color-border);
+  border-radius: 2px;
+}
+
+.pipeline-progress__parallel-lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pipeline-progress__parallel-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+  writing-mode: vertical-lr;
+  opacity: 0.6;
+}
+
+/* ── Progress bar ─────────────────────────────────────────────────────────── */
+
+.pipeline-progress__bar-track {
+  height: 4px;
+  background: var(--color-surface-2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.pipeline-progress__bar-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 2px;
+  transition: width 0.6s ease;
+}
+
+.pipeline-progress__hint {
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
 /* ── Error card ────────────────────────────────────────────────────────────── */
 
 .error-card {

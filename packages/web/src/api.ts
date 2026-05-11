@@ -1,6 +1,7 @@
 /**
  * API client for uweather backend.
  * Base URL is injected by Vite via VITE_API_URL environment variable.
+ * WebSocket URL is injected via VITE_WS_URL for real-time pipeline progress.
  */
 
 export interface WeatherSummary {
@@ -32,6 +33,7 @@ export interface HistoryResponse {
 }
 
 const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
+export const WS_URL = (import.meta.env.VITE_WS_URL as string | undefined) ?? '';
 
 /** Shape returned by GET /forecast (HTTP 202 — pipeline started). */
 interface ForecastStartResponse {
@@ -65,30 +67,30 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Fetch a forecast for the given city.
- *
- * Internally uses the two-step async API:
- *  1. GET /forecast          → 202 { executionArn }
- *  2. GET /forecast/status   → 202 (pending) | 200 ForecastResponse | 500 error
- *
- * Polls step 2 every 3 s until a terminal response arrives.
- * The caller (App.tsx) sees no change — it still gets a Promise<ForecastResponse>.
+ * Start the forecast pipeline and return the executionArn.
+ * The caller is responsible for tracking progress via WebSocket
+ * and polling for the final result.
  */
-export async function getForecast(
+export async function startForecast(
   city: string,
   lang: string,
   userId: string,
   coords?: { lat: number; lon: number },
-): Promise<ForecastResponse> {
-  // ── Step 1: start the pipeline ────────────────────────────────────────────
+): Promise<string> {
   const startParams = new URLSearchParams({ city, lang, userId });
   if (coords) {
     startParams.set('lat', String(coords.lat));
     startParams.set('lon', String(coords.lon));
   }
   const { executionArn } = await apiFetch<ForecastStartResponse>(`/forecast?${startParams}`);
+  return executionArn;
+}
 
-  // ── Step 2: poll for the result ───────────────────────────────────────────
+/**
+ * Poll for the forecast result. Called after pipeline completes
+ * (detected via WebSocket) or as a fallback if WebSocket is unavailable.
+ */
+export async function pollForecastResult(executionArn: string): Promise<ForecastResponse> {
   const statusParams = new URLSearchParams({ executionArn });
 
   for (let poll = 0; poll < MAX_POLLS; poll++) {
@@ -97,22 +99,33 @@ export async function getForecast(
     const response = await fetch(`${BASE_URL}/forecast/status?${statusParams}`);
 
     if (response.status === 202) {
-      // Pipeline still running — keep polling
       const body = (await response.json()) as ForecastPendingResponse;
       if (body.status === 'pending') continue;
     }
 
     if (response.ok) {
-      // 200 — pipeline succeeded, full forecast returned
       return response.json() as Promise<ForecastResponse>;
     }
 
-    // 4xx / 5xx — pipeline failed
     const body = (await response.json().catch(() => ({}))) as { error?: string; message?: string };
     throw new Error(body.error ?? body.message ?? `Forecast failed: ${response.status}`);
   }
 
   throw new Error('Forecast timed out — please try again.');
+}
+
+/**
+ * Fetch a forecast — high-level API that combines start + poll.
+ * Used as fallback when WebSocket is not available.
+ */
+export async function getForecast(
+  city: string,
+  lang: string,
+  userId: string,
+  coords?: { lat: number; lon: number },
+): Promise<ForecastResponse> {
+  const executionArn = await startForecast(city, lang, userId, coords);
+  return pollForecastResult(executionArn);
 }
 
 export function getHistory(userId: string, limit = 10): Promise<HistoryResponse> {

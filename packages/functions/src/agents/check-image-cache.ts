@@ -1,6 +1,7 @@
 import { buildImageCacheKey, createLogger, emitMetric } from '@uweather/core';
 import type { ConsensusForecast, TimeSlot } from '@uweather/core';
 import type { Context } from 'aws-lambda';
+import { reportStage } from '../lib/report-stage.js';
 import { forecastService } from '../services/index.js';
 
 const log = createLogger({ function: 'check-image-cache' });
@@ -10,6 +11,7 @@ export interface CheckImageCacheInput {
   date: string;
   timeSlot: TimeSlot;
   consensus: ConsensusForecast;
+  executionArn?: string;
 }
 
 export type CheckImageCacheOutput =
@@ -39,6 +41,7 @@ export async function handler(
   });
 
   const reqLog = log.child({ requestId: context.awsRequestId, city: input.city, imageCacheKey });
+  if (input.executionArn) await reportStage(input.executionArn, 'image_cache', 'started');
   reqLog.info('Checking image cache');
 
   const imageUrl = await forecastService.findImageUrl(imageCacheKey);
@@ -46,10 +49,12 @@ export async function handler(
   if (imageUrl) {
     reqLog.info('Image cache hit', { imageUrl });
     emitMetric('ImageCacheHit', 1);
+    if (input.executionArn) await reportStage(input.executionArn, 'image_cache', 'done');
     return { cacheHit: true, imageUrl, imageCacheKey };
   }
 
   reqLog.info('Image cache miss');
   emitMetric('ImageCacheMiss', 1);
+  if (input.executionArn) await reportStage(input.executionArn, 'image_cache', 'done');
   return { cacheHit: false, imageCacheKey };
 }

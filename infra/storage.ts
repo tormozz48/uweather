@@ -43,6 +43,21 @@ export const forecastsTable = new sst.aws.Dynamo('Forecasts', {
 });
 
 /**
+ * WebSocketConnections — maps Step Functions executionArn to API Gateway
+ * WebSocket connectionId(s) for real-time pipeline progress updates.
+ * PK: executionArn   SK: connectionId
+ * TTL: 10 minutes (pipeline never takes longer than 5 min; safety margin).
+ */
+export const connectionsTable = new sst.aws.Dynamo('WebSocketConnections', {
+  fields: {
+    pk: 'string',
+    sk: 'string',
+  },
+  primaryIndex: { hashKey: 'pk', rangeKey: 'sk' },
+  ttl: 'ttl',
+});
+
+/**
  * Users — stores web user profiles and preferences.
  * PK: USER#{platform}#{platformId}  SK: PROFILE
  */

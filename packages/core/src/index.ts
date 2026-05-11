@@ -50,6 +50,18 @@ export type {
 } from './weather/index.js';
 
 export {
+  VISUAL_STAGES,
+} from './pipeline-stages.js';
+
+export type {
+  PipelineStageId,
+  StageProgressMessage,
+  PipelineCompleteMessage,
+  PipelineWsMessage,
+  VisualStage,
+} from './pipeline-stages.js';
+
+export {
   buildComparePrompt,
   buildFunnyTextPrompt,
   buildImageGenPrompt,

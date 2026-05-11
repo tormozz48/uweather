@@ -12,6 +12,7 @@
 import { createLogger } from '@uweather/core';
 import type { ConsensusForecast, TimeSlot } from '@uweather/core';
 import type { Context } from 'aws-lambda';
+import { reportStage } from './lib/report-stage.js';
 import { forecastService } from './services/index.js';
 
 const log = createLogger({ function: 'save-forecast' });
@@ -27,6 +28,7 @@ export interface SaveForecastInput {
   imageUrl: string;
   imageCacheKey: string;
   sourcesUsed: ('openweather' | 'weatherapi' | 'open-meteo')[];
+  executionArn?: string;
 }
 
 export interface SaveForecastOutput {
@@ -46,6 +48,7 @@ export async function handler(
     userId: input.userId,
   });
 
+  if (input.executionArn) await reportStage(input.executionArn, 'save', 'started');
   reqLog.info('Saving forecast', {
     language: input.language,
     timeSlot: input.timeSlot,
@@ -68,6 +71,7 @@ export async function handler(
   });
 
   reqLog.info('Forecast saved', { forecastId });
+  if (input.executionArn) await reportStage(input.executionArn, 'save', 'done');
 
   return {
     forecastId,
