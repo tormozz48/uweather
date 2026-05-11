@@ -7,6 +7,11 @@ export interface ProviderInput {
   city: string; // Already normalized by orchestrator
   language: string;
   date: string; // YYYY-MM-DD
+  /** Pre-resolved coordinates from the client's geocoding selection. When present,
+   *  provider clients skip their own geocoding / city-string lookup and query by
+   *  lat/lon directly — eliminating city-name ambiguity. */
+  lat?: number;
+  lon?: number;
 }
 
 /** Output shape for a successful provider Lambda invocation. */

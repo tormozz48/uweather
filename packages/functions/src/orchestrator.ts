@@ -29,6 +29,10 @@ export interface OrchestratorInput {
   userId?: string;
   /** Propagated from calling Lambda context for end-to-end correlation */
   correlationId?: string;
+  /** Pre-resolved coordinates from the client's geocoding selection.
+   *  Forwarded to provider Lambdas so they skip their own geocoding. */
+  lat?: number;
+  lon?: number;
 }
 
 export type OrchestratorOutput =
@@ -47,6 +51,10 @@ export async function handler(
   const cityNormalized = normalizeCity(city);
   const date = toDateString();
   const timeSlot = getCurrentTimeSlot();
+  const coords =
+    input.lat !== undefined && input.lon !== undefined
+      ? { lat: input.lat, lon: input.lon }
+      : undefined;
 
   // Support both Lambda context requestId and explicit correlationId from callers
   const requestId = context?.awsRequestId ?? input.correlationId;
@@ -84,7 +92,7 @@ export async function handler(
     new StartExecutionCommand({
       stateMachineArn,
       name: executionName,
-      input: JSON.stringify({ city: cityNormalized, language, date, userId, timeSlot }),
+      input: JSON.stringify({ city: cityNormalized, language, date, userId, timeSlot, ...coords }),
     }),
   );
 

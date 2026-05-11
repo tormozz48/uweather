@@ -78,9 +78,14 @@ export async function getForecast(
   city: string,
   lang: string,
   userId: string,
+  coords?: { lat: number; lon: number },
 ): Promise<ForecastResponse> {
   // ── Step 1: start the pipeline ────────────────────────────────────────────
   const startParams = new URLSearchParams({ city, lang, userId });
+  if (coords) {
+    startParams.set('lat', String(coords.lat));
+    startParams.set('lon', String(coords.lon));
+  }
   const { executionArn } = await apiFetch<ForecastStartResponse>(`/forecast?${startParams}`);
 
   // ── Step 2: poll for the result ───────────────────────────────────────────

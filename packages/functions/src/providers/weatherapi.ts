@@ -27,7 +27,10 @@ export async function handler(
   reqLog.info('Fetching weather from WeatherAPI');
 
   try {
-    const data = await fetchWeatherAPI(city, Resource.WeatherApiKey.value);
+    const coords = input.lat !== undefined && input.lon !== undefined
+      ? { lat: input.lat, lon: input.lon }
+      : undefined;
+    const data = await fetchWeatherAPI(city, Resource.WeatherApiKey.value, coords);
 
     const cityNormalized = normalizeCity(city);
     await weatherCacheService.save({ city: cityNormalized, date, provider: PROVIDER_NAME, data });

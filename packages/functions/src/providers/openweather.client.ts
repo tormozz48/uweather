@@ -6,9 +6,21 @@ const BASE_URL = 'https://api.openweathermap.org/data/2.5/weather';
 /**
  * OpenWeatherMap HTTP client — pure fetch, no AWS/SST dependencies.
  * Used by the Lambda handler and by integration tests.
+ *
+ * When lat/lon are provided, queries by coordinates (no city-name ambiguity).
+ * Falls back to the city-string `?q=` endpoint when coordinates are absent.
  */
-export async function fetchOpenWeather(city: string, apiKey: string): Promise<UnifiedWeatherData> {
-  const url = `${BASE_URL}?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric`;
+export async function fetchOpenWeather(
+  city: string,
+  apiKey: string,
+  coords?: { lat: number; lon: number },
+): Promise<UnifiedWeatherData> {
+  const baseParams = `appid=${apiKey}&units=metric`;
+  const locationParam = coords
+    ? `lat=${coords.lat}&lon=${coords.lon}`
+    : `q=${encodeURIComponent(city)}`;
+
+  const url = `${BASE_URL}?${locationParam}&${baseParams}`;
 
   const response = await fetch(url);
   if (!response.ok) {

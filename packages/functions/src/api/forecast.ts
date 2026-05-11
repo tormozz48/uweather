@@ -33,12 +33,13 @@ async function startPipeline(
   language: string,
   userId: string,
   correlationId: string,
+  coords?: { lat: number; lon: number },
 ): Promise<string> {
   const cityNormalized = normalizeCity(city);
   const date = toDateString();
   const timeSlot = getCurrentTimeSlot();
 
-  const result = await orchestratorHandler({ city, language, userId, correlationId });
+  const result = await orchestratorHandler({ city, language, userId, correlationId, ...coords });
 
   if (!result.cacheHit) {
     return result.executionArn;
@@ -53,7 +54,7 @@ async function startPipeline(
     new StartExecutionCommand({
       stateMachineArn,
       name: executionName,
-      input: JSON.stringify({ city: cityNormalized, language, date, userId, timeSlot }),
+      input: JSON.stringify({ city: cityNormalized, language, date, userId, timeSlot, ...coords }),
     }),
   );
   const executionArn = execution.executionArn;
@@ -89,15 +90,21 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
   const city = params.city?.trim();
   const language = params.lang?.trim() ?? 'en';
   const userId = params.userId?.trim() ?? 'anonymous';
+  const latRaw = params.lat ? Number(params.lat) : undefined;
+  const lonRaw = params.lon ? Number(params.lon) : undefined;
+  const coords =
+    latRaw !== undefined && lonRaw !== undefined && !Number.isNaN(latRaw) && !Number.isNaN(lonRaw)
+      ? { lat: latRaw, lon: lonRaw }
+      : undefined;
 
   if (!city) {
     return jsonBadRequest('city query parameter is required');
   }
 
-  reqLog.info('Forecast start request', { city, language, userId });
+  reqLog.info('Forecast start request', { city, language, userId, coords });
 
   try {
-    const executionArn = await startPipeline(city, language, userId, requestId);
+    const executionArn = await startPipeline(city, language, userId, requestId, coords);
 
     reqLog.info('Pipeline started', { executionArn, city, language });
 

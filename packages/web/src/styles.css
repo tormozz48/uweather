@@ -155,6 +155,85 @@ body {
   cursor: not-allowed;
 }
 
+/* ── City autocomplete ─────────────────────────────────────────────────────── */
+
+.city-autocomplete {
+  position: relative;
+  flex: 1;
+}
+
+.city-autocomplete .search-form__input {
+  width: 100%;
+}
+
+/* Spinner dot shown while fetching suggestions */
+.city-autocomplete__spinner {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.65s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes spin {
+  to { transform: translateY(-50%) rotate(360deg); }
+}
+
+/* Dropdown list */
+.city-autocomplete__dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  animation: fadeIn 0.12s ease;
+}
+
+/* Suggestion row */
+.city-autocomplete__item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.city-autocomplete__item:not(:last-child) {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.city-autocomplete__item:hover,
+.city-autocomplete__item--active {
+  background: var(--color-surface-2);
+}
+
+.city-autocomplete__item-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.city-autocomplete__item-sub {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── Skeleton loader ───────────────────────────────────────────────────────── */
 
 @keyframes shimmer {

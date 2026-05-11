@@ -6,6 +6,7 @@ import { ForecastSection } from './components/ForecastSection.js';
 import { HistoryList } from './components/HistoryList.js';
 import { LoadingSection } from './components/LoadingSection.js';
 import { SearchForm } from './components/SearchForm.js';
+import type { CityCoords } from './components/SearchForm.js';
 import { getSessionId } from './lib/session.js';
 
 type AppState =
@@ -16,6 +17,7 @@ type AppState =
 
 export function App() {
   const [city, setCity] = useState('');
+  const [coords, setCoords] = useState<CityCoords | undefined>(undefined);
   const [lang, setLang] = useState('en');
   const [state, setState] = useState<AppState>({ status: 'idle' });
   const [history, setHistory] = useState<ForecastResponse[]>([]);
@@ -30,6 +32,11 @@ export function App() {
       });
   }, [sessionId]);
 
+  const handleCityChange = useCallback((value: string, newCoords?: CityCoords) => {
+    setCity(value);
+    setCoords(newCoords);
+  }, []);
+
   const handleSubmit = useCallback(
     async (e: FormEvent) => {
       e.preventDefault();
@@ -39,7 +46,7 @@ export function App() {
       setState({ status: 'loading' });
 
       try {
-        const forecast = await getForecast(trimmed, lang, sessionId);
+        const forecast = await getForecast(trimmed, lang, sessionId, coords);
         setState({ status: 'success', forecast });
 
         // Prepend to local history (avoid duplicates by forecastId)
@@ -54,7 +61,7 @@ export function App() {
         });
       }
     },
-    [city, lang, sessionId, state.status],
+    [city, coords, lang, sessionId, state.status],
   );
 
   const handleHistorySelect = (forecast: ForecastResponse) => {
@@ -79,7 +86,7 @@ export function App() {
           city={city}
           lang={lang}
           isLoading={state.status === 'loading'}
-          onCityChange={setCity}
+          onCityChange={handleCityChange}
           onLangChange={setLang}
           onSubmit={handleSubmit}
         />
