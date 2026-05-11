@@ -25,7 +25,7 @@ const CACHE_FRESH_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
 export interface OrchestratorInput {
   city: string;
   language?: string;
-  /** Telegram chatId or web sessionId — defaults to 'anonymous' until Phase 4 */
+  /** Web sessionId — defaults to 'anonymous' */
   userId?: string;
   /** Propagated from calling Lambda context for end-to-end correlation */
   correlationId?: string;

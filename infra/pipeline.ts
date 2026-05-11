@@ -31,7 +31,6 @@ import { forecastsTable, imagesBucket, imagesCdn, weatherCacheTable } from './st
 
 export const openWeatherApiKey = new sst.Secret('OpenWeatherApiKey');
 export const weatherApiKey = new sst.Secret('WeatherApiKey');
-export const telegramBotToken = new sst.Secret('TelegramBotToken');
 export const pixazoApiKey = new sst.Secret('PixazoApiKey');
 
 // ── CloudWatch Log Group for Step Functions ───────────────────────────────────

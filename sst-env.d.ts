@@ -62,10 +62,6 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Function"
     }
-    "TelegramBotToken": {
-      "type": "sst.sst.Secret"
-      "value": string
-    }
     "Users": {
       "name": string
       "type": "sst.aws.Dynamo"

@@ -82,13 +82,11 @@ export class UserService {
    * Create-or-update a user profile.
    * On first visit: writes a full profile with defaults.
    * On subsequent visits: patches only the provided fields and touches lastActiveAt.
-   *
-   * @param chatId - Platform-specific user ID (Telegram chatId, web sessionId, etc.)
    */
   async upsert(
     platform: UserPlatform,
     platformId: string | number,
-    updates: UserUpdates & { chatId?: string },
+    updates: UserUpdates,
   ): Promise<void> {
     const now = new Date().toISOString();
     const existing = await this.get(platform, platformId);
@@ -98,7 +96,6 @@ export class UserService {
         pk: this.buildPk(platform, platformId),
         sk: 'PROFILE',
         platform,
-        chatId: updates.chatId,
         language: updates.language ?? 'en',
         city: updates.city ?? '',
         country: updates.country ?? '',

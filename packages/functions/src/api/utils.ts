@@ -56,6 +56,14 @@ export function jsonOk<T>(body: T) {
   } as const;
 }
 
+export function jsonAccepted<T>(body: T) {
+  return {
+    statusCode: 202,
+    headers: JSON_HEADERS,
+    body: JSON.stringify(body),
+  } as const;
+}
+
 export function jsonBadRequest(error: string) {
   return {
     statusCode: 400,

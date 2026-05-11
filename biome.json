@@ -29,7 +29,17 @@
       "quoteStyle": "single",
       "trailingCommas": "all"
     },
-    "globals": ["$config", "$app", "$util", "$transform", "$interpolate", "$resolve", "$jsonStringify", "sst", "aws"]
+    "globals": [
+      "$config",
+      "$app",
+      "$util",
+      "$transform",
+      "$interpolate",
+      "$resolve",
+      "$jsonStringify",
+      "sst",
+      "aws"
+    ]
   },
   "files": {
     "ignore": ["node_modules", ".sst", "dist", "build", ".turbo", "**/sst-env.d.ts"]

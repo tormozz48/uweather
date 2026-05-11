@@ -58,7 +58,7 @@ export class ForecastService {
    * List a user's past forecasts, newest first.
    * Queries the UserHistoryIndex GSI.
    *
-   * @param userId - Telegram chatId or web sessionId
+   * @param userId - web sessionId
    * @param limit  - Max results (1–50), defaults to 10
    */
   async listByUser(userId: string, limit = 10): Promise<ForecastResult[]> {

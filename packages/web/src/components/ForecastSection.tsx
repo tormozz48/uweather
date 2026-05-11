@@ -18,7 +18,9 @@ export function ForecastSection({ forecast }: ForecastSectionProps) {
         {forecast.funnyText
           .split('\n')
           .filter((para) => para.trim())
-          .map((para) => <p key={para}>{para}</p>)}
+          .map((para) => (
+            <p key={para}>{para}</p>
+          ))}
       </div>
     </div>
   );

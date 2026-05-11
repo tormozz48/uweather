@@ -88,8 +88,13 @@ const dashboardBody = $resolve([
   });
 
   // Helper: custom namespace metric with service=uweather dimension
-  const m = (metricName: string, ...rest: unknown[]) =>
-    [ns, metricName, 'service', 'uweather', ...rest];
+  const m = (metricName: string, ...rest: unknown[]) => [
+    ns,
+    metricName,
+    'service',
+    'uweather',
+    ...rest,
+  ];
 
   const widgets = [
     // ── Row 1 ──────────────────────────────────────────────────────────────
@@ -100,9 +105,27 @@ const dashboardBody = $resolve([
       0,
       8,
       mkProps('Step Functions Executions', [
-        ['AWS/States', 'ExecutionsSucceeded', 'StateMachineArn', sfnArn, { label: 'Succeeded', color: '#2ca02c' }],
-        ['AWS/States', 'ExecutionsFailed', 'StateMachineArn', sfnArn, { label: 'Failed', color: '#d62728' }],
-        ['AWS/States', 'ExecutionThrottled', 'StateMachineArn', sfnArn, { label: 'Throttled', color: '#ff7f0e' }],
+        [
+          'AWS/States',
+          'ExecutionsSucceeded',
+          'StateMachineArn',
+          sfnArn,
+          { label: 'Succeeded', color: '#2ca02c' },
+        ],
+        [
+          'AWS/States',
+          'ExecutionsFailed',
+          'StateMachineArn',
+          sfnArn,
+          { label: 'Failed', color: '#d62728' },
+        ],
+        [
+          'AWS/States',
+          'ExecutionThrottled',
+          'StateMachineArn',
+          sfnArn,
+          { label: 'Throttled', color: '#ff7f0e' },
+        ],
       ]),
     ),
 
@@ -170,8 +193,14 @@ const dashboardBody = $resolve([
       6,
       8,
       mkProps('Bedrock Throttling + Forecast Quality', [
-        m('BedrockThrottled', 'agent', 'compare', { label: 'Throttled (compare)', color: '#d62728' }),
-        m('BedrockThrottled', 'agent', 'funny-text', { label: 'Throttled (funny-text)', color: '#e377c2' }),
+        m('BedrockThrottled', 'agent', 'compare', {
+          label: 'Throttled (compare)',
+          color: '#d62728',
+        }),
+        m('BedrockThrottled', 'agent', 'funny-text', {
+          label: 'Throttled (funny-text)',
+          color: '#e377c2',
+        }),
         m('LowConfidenceForecast', { label: 'Low-confidence (1 provider)', color: '#ff7f0e' }),
       ]),
     ),
@@ -186,8 +215,20 @@ const dashboardBody = $resolve([
       mkProps(
         'API Gateway — Request Errors',
         [
-          ['AWS/ApiGateway', '4XXError', 'ApiId', apiId, { label: '4xx Client Errors', color: '#ff7f0e' }],
-          ['AWS/ApiGateway', '5XXError', 'ApiId', apiId, { label: '5xx Server Errors', color: '#d62728' }],
+          [
+            'AWS/ApiGateway',
+            '4XXError',
+            'ApiId',
+            apiId,
+            { label: '4xx Client Errors', color: '#ff7f0e' },
+          ],
+          [
+            'AWS/ApiGateway',
+            '5XXError',
+            'ApiId',
+            apiId,
+            { label: '5xx Server Errors', color: '#d62728' },
+          ],
           ['AWS/ApiGateway', 'Count', 'ApiId', apiId, { label: 'Total Requests', yAxis: 'right' }],
         ],
         {

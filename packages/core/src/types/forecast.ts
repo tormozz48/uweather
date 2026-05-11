@@ -5,7 +5,7 @@ import type { ConsensusForecast } from './weather.js';
  */
 export interface ForecastResult {
   forecastId: string; // ULID
-  userId: string; // Telegram chatId or web sessionId
+  userId: string; // web sessionId
   city: string; // normalized city name
   country: string; // country code
   date: string; // YYYY-MM-DD

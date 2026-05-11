@@ -43,7 +43,7 @@ export const forecastsTable = new sst.aws.Dynamo('Forecasts', {
 });
 
 /**
- * Users — stores Telegram/web user profiles and preferences.
+ * Users — stores web user profiles and preferences.
  * PK: USER#{platform}#{platformId}  SK: PROFILE
  */
 export const usersTable = new sst.aws.Dynamo('Users', {

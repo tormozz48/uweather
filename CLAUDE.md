@@ -1,6 +1,6 @@
 # uweather
 
-AI-powered weather app that delivers funny, location-aware forecasts with generated images via Telegram bot and web UI.
+AI-powered weather app that delivers funny, location-aware forecasts with generated images via web UI.
 
 ## Stack
 
@@ -8,7 +8,6 @@ AI-powered weather app that delivers funny, location-aware forecasts with genera
 - **Runtime**: Node.js 20+
 - **IaC**: SST v3 (Ion) → CloudFormation
 - **Cloud**: AWS (serverless-only)
-- **Telegram**: grammY (webhook mode, not polling)
 - **Web**: Vite + React SPA (anonymous, no auth)
 - **AI**: Amazon Bedrock (Claude 4.5 Haiku for text, Titan Image Generator v2 for images)
 - **Database**: DynamoDB (multi-table, on-demand billing)
@@ -44,7 +43,6 @@ uweather/
 │   │       │   ├── compare.ts    # Agent 1: weather comparison
 │   │       │   ├── funny-text.ts # Agent 2: localized funny text
 │   │       │   └── image-gen.ts  # Agent 3: image generation
-│   │       ├── telegram/
 │   │       │   └── webhook.ts    # grammY webhook handler
 │   │       └── api/
 │   │           ├── forecast.ts   # GET /forecast?city=X&lang=Y
@@ -83,7 +81,6 @@ pnpm --filter web dev            # local web dev server
 - DynamoDB tables use on-demand billing mode (no capacity planning)
 - All AI prompts live in `packages/core/src/prompts/` as template functions
 - Image cache key: `{city}:{date}:{timeSlot}:{condition}:{tempBucket}` (see TECHNICAL_SPEC.md)
-- Telegram bot uses "send loading → edit with result" pattern
 - Follow Karpathy Guidelines from SKILL.md: simplicity first, surgical changes, goal-driven execution
 
 ## Key Architecture Decisions
@@ -101,7 +98,6 @@ See `docs/adr/001-architecture.md` for full context. Summary:
 
 Managed by SST via `Resource` bindings (not .env files):
 
-- `TELEGRAM_BOT_TOKEN` — via SST Secret
 - `OPENWEATHER_API_KEY` — via SST Secret
 - `WEATHERAPI_KEY` — via SST Secret
 - Bedrock, DynamoDB, S3 — accessed via IAM roles (no keys needed)

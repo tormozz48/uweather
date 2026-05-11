@@ -1,18 +1,18 @@
-import { forecastPipeline, telegramBotToken } from './pipeline.ts';
+import { forecastPipeline } from './pipeline.ts';
 /**
  * infra/api.ts — Phase 4: API Gateway routes + Lambda bindings
  *                Phase 5 updates: X-Ray tracing on all route Lambdas
  *
  * Routes:
  *   GET  /health              — liveness check
- *   GET  /forecast            — get AI forecast (polls Step Functions)
+ *   GET  /forecast            — start AI forecast pipeline, returns 202 + executionArn
+ *   GET  /forecast/status     — poll pipeline status; returns 202 (pending) or 200 (done)
  *   GET  /history             — get user forecast history
- *   POST /telegram/webhook    — Telegram bot webhook
  *
  * Import order requirement: pipeline.ts must be imported before this file
- * because api.ts depends on forecastPipeline and telegramBotToken.
+ * because api.ts depends on forecastPipeline.
  */
-import { forecastsTable, usersTable, weatherCacheTable } from './storage.ts';
+import { forecastsTable, weatherCacheTable } from './storage.ts';
 
 // ── Shared X-Ray config ───────────────────────────────────────────────────────
 //
@@ -49,17 +49,21 @@ export const api = new sst.aws.ApiGatewayV2('Api', {
   },
 });
 
-// ── Shared Step Functions permissions ─────────────────────────────────────────
+// ── Step Functions permissions (split by action) ──────────────────────────────
 //
 // StartExecution targets the state machine ARN.
 // DescribeExecution targets execution ARNs (different ARN namespace: "execution"
 // vs "stateMachine"), so we use a wildcard for that action.
+// Each Lambda gets only the permission it actually needs.
 
-const sfnPermissions = [
+const sfnStartPermissions = [
   {
     actions: ['states:StartExecution'],
     resources: [forecastPipeline.arn],
   },
+];
+
+const sfnDescribePermissions = [
   {
     // Execution ARN format: arn:aws:states:{region}:{account}:execution:{name}:{execId}
     // Cannot derive it from the state machine ARN directly — use wildcard.
@@ -79,19 +83,34 @@ api.route('GET /health', {
 // ── GET /forecast ─────────────────────────────────────────────────────────────
 //
 // Calls the orchestrator inline (bundled), starts Step Functions if needed,
-// polls until complete (≤85 s), returns ForecastResponse JSON.
-// Lambda timeout 120 s > API Gateway 29 s — client gets a 504 at GW timeout,
-// but the Lambda continues; the result is stored in DynamoDB on success.
-// For MVP this polling-in-Lambda approach is acceptable.
+// and returns immediately with HTTP 202 { status: "pending", executionArn }.
+// No polling — the client drives the polling loop via GET /forecast/status.
+// Lambda timeout kept low (15 s): only orchestrator check + SFN StartExecution.
 
 api.route('GET /forecast', {
   handler: 'packages/functions/src/api/forecast.handler',
-  link: [weatherCacheTable, forecastsTable],
+  link: [weatherCacheTable],
   environment: {
     STATE_MACHINE_ARN: forecastPipeline.arn,
   },
-  permissions: [...sfnPermissions, ...xrayPermissions],
-  timeout: '120 seconds',
+  permissions: [...sfnStartPermissions, ...xrayPermissions],
+  timeout: '15 seconds',
+  memory: '256 MB',
+  transform: xrayTransform,
+});
+
+// ── GET /forecast/status ──────────────────────────────────────────────────────
+//
+// Single DescribeExecution call — no polling loop, no long-running Lambda.
+// Returns 202 while RUNNING, 200 + ForecastResponse on SUCCEEDED,
+// 500 on FAILED / TIMED_OUT / ABORTED.
+// Client polls this endpoint every 3–5 s until it gets a terminal response.
+
+api.route('GET /forecast/status', {
+  handler: 'packages/functions/src/api/forecast-status.handler',
+  link: [forecastsTable],
+  permissions: [...sfnDescribePermissions, ...xrayPermissions],
+  timeout: '15 seconds',
   memory: '256 MB',
   transform: xrayTransform,
 });
@@ -104,23 +123,5 @@ api.route('GET /history', {
   timeout: '15 seconds',
   memory: '256 MB',
   permissions: xrayPermissions,
-  transform: xrayTransform,
-});
-
-// ── POST /telegram/webhook ────────────────────────────────────────────────────
-//
-// grammY aws-lambda-async mode: API Gateway gets 200 immediately; the bot
-// handler runs asynchronously inside the Lambda process.
-// The handler calls the orchestrator inline (bundled) and polls Step Functions.
-
-api.route('POST /telegram/webhook', {
-  handler: 'packages/functions/src/telegram/webhook.handler',
-  link: [usersTable, forecastsTable, weatherCacheTable, telegramBotToken],
-  environment: {
-    STATE_MACHINE_ARN: forecastPipeline.arn,
-  },
-  permissions: [...sfnPermissions, ...xrayPermissions],
-  timeout: '120 seconds',
-  memory: '512 MB',
   transform: xrayTransform,
 });

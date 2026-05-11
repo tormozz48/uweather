@@ -1,27 +1,21 @@
 import { randomUUID } from 'node:crypto';
-import { DescribeExecutionCommand, SFNClient, StartExecutionCommand } from '@aws-sdk/client-sfn';
+import { SFNClient, StartExecutionCommand } from '@aws-sdk/client-sfn';
 import { createLogger, getCurrentTimeSlot, normalizeCity, toDateString } from '@uweather/core';
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import { handler as orchestratorHandler } from '../orchestrator.js';
-import {
-  fetchForecastById,
-  jsonBadRequest,
-  jsonOk,
-  jsonServerError,
-  toForecastResponse,
-} from './utils.js';
+import { jsonAccepted, jsonBadRequest, jsonServerError } from './utils.js';
 
 const sfn = new SFNClient({});
 const log = createLogger({ function: 'api-forecast' });
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-/** Output shape returned by the SaveForecast Step Functions task. */
-interface PipelineOutput {
-  forecastId: string;
-  imageUrl: string;
+/** Shape returned to the client on a successful pipeline start (HTTP 202). */
+export interface ForecastStartResponse {
+  status: 'pending';
+  executionArn: string;
   city: string;
-  date: string;
+  language: string;
 }
 
 // ── Pipeline helpers ──────────────────────────────────────────────────────────
@@ -67,50 +61,25 @@ async function startPipeline(
   return executionArn;
 }
 
-/**
- * Poll a Step Functions execution until it succeeds, fails, or times out.
- * Resolves with the execution output (SaveForecastOutput) on success.
- */
-async function pollExecution(executionArn: string, timeoutMs = 85_000): Promise<PipelineOutput> {
-  const startedAt = Date.now();
-
-  while (Date.now() - startedAt < timeoutMs) {
-    await new Promise((resolve) => setTimeout(resolve, 3_000));
-
-    const { status, output, cause } = await sfn.send(
-      new DescribeExecutionCommand({ executionArn }),
-    );
-
-    if (status === 'SUCCEEDED') {
-      return JSON.parse(output ?? '{}') as PipelineOutput;
-    }
-    if (status === 'FAILED' || status === 'TIMED_OUT' || status === 'ABORTED') {
-      throw new Error(`Pipeline ${status.toLowerCase()}: ${cause ?? 'unknown error'}`);
-    }
-    // RUNNING → keep polling
-  }
-
-  throw new Error('Forecast pipeline timed out');
-}
-
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 /**
  * GET /forecast?city={city}&lang={lang}&userId={userId}
  *
- * Invokes the orchestrator, starts the Step Functions pipeline if needed, polls
- * until complete, then returns the full ForecastResponse JSON.
+ * Starts the forecast pipeline and returns immediately — no polling.
+ * The client must poll GET /forecast/status?executionArn={arn} until the
+ * forecast is ready (HTTP 200) or has failed (HTTP 500).
  *
  * Query params:
  *   city     — required, non-empty
  *   lang     — optional, ISO 639-1, default "en"
  *   userId   — optional, caller-provided session ID; defaults to "anonymous"
  *
- * Polling: the pipeline takes 15–30 s end-to-end (Bedrock + provider fetches).
- * The Lambda polls Step Functions with a 3-second interval up to an 85-second
- * hard timeout; API Gateway HTTP API has a 29-second integration timeout, so
- * the client may receive a 504 before Lambda finishes — the forecast is still
- * stored in DynamoDB and available via /history on the next request.
+ * Response 202 — ForecastStartResponse:
+ *   { status: "pending", executionArn: string, city: string, language: string }
+ *
+ * The pipeline takes 15–30 s end-to-end (Bedrock + provider fetches).
+ * Poll /forecast/status every 3–5 s until you receive HTTP 200 or 500.
  */
 export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
   const requestId = context.awsRequestId;
@@ -125,24 +94,21 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
     return jsonBadRequest('city query parameter is required');
   }
 
-  reqLog.info('Forecast request', { city, language, userId });
+  reqLog.info('Forecast start request', { city, language, userId });
 
   try {
     const executionArn = await startPipeline(city, language, userId, requestId);
-    const { forecastId } = await pollExecution(executionArn);
-    const forecast = await fetchForecastById(forecastId);
 
-    reqLog.info('Forecast delivered', { forecastId: forecast.forecastId, city: forecast.city });
+    reqLog.info('Pipeline started', { executionArn, city, language });
 
-    return jsonOk(toForecastResponse(forecast));
+    return jsonAccepted<ForecastStartResponse>({
+      status: 'pending',
+      executionArn,
+      city: normalizeCity(city),
+      language,
+    });
   } catch (err) {
-    reqLog.error('Forecast error', { city, error: (err as Error).message });
-
-    const isTimeout = err instanceof Error && err.message.includes('timed out');
-    return jsonServerError(
-      isTimeout ? 504 : 500,
-      isTimeout ? 'Forecast is taking longer than expected' : 'Failed to generate forecast',
-      err instanceof Error ? err.message : String(err),
-    );
+    reqLog.error('Forecast start error', { city, error: (err as Error).message });
+    return jsonServerError(500, 'Failed to start forecast pipeline', (err as Error).message);
   }
 };

@@ -15,7 +15,7 @@ const appName = `uweather-${$app.stage}`;
  */
 export const application = new aws.servicecatalog.AppregistryApplication('UweatherApp', {
   name: appName,
-  description: 'AI-powered weather app with Telegram bot and web UI',
+  description: 'AI-powered weather app with web UI',
   tags: {
     Application: 'uweather',
     Stage: $app.stage,

@@ -1,4 +1,4 @@
-export type UserPlatform = 'telegram' | 'web';
+export type UserPlatform = 'web';
 
 export interface UserProfile {
   /** PK: `USER#{platform}#{platformId}` */
@@ -6,8 +6,6 @@ export interface UserProfile {
   /** SK: `PROFILE` */
   sk: 'PROFILE';
   platform: UserPlatform;
-  /** Telegram chat ID (undefined for web users) */
-  chatId?: string;
   /** Preferred language (ISO 639-1), e.g. "en", "uk" */
   language: string;
   /** Last used city (normalized) */
