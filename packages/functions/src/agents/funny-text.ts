@@ -1,14 +1,12 @@
-import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
-import { buildFunnyTextPrompt, createLogger, emitMetric } from '@uweather/core';
+import { buildFunnyTextPrompt, createLogger } from '@uweather/core';
 import type { ConsensusForecast } from '@uweather/core';
 import type { Context } from 'aws-lambda';
+import { callBedrock } from '../lib/bedrock.js';
 import { reportStage } from '../lib/report-stage.js';
 import { forecastService } from '../services/index.js';
 
-const bedrock = new BedrockRuntimeClient({});
 const log = createLogger({ function: 'agent-funny-text' });
 
-const MODEL_ID = 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
 const MAX_HISTORY_ITEMS = 5;
 
 export interface FunnyTextInput {
@@ -54,59 +52,13 @@ export async function handler(input: FunnyTextInput, context: Context): Promise<
     recentHistory,
   });
 
-  // Track Bedrock latency manually so we can emit the metric regardless of success/failure
-  const bedrockStart = Date.now();
-  let bedrockDurationMs = 0;
-
-  let funnyText: string;
-  try {
-    const response = await bedrock.send(
-      new InvokeModelCommand({
-        modelId: MODEL_ID,
-        contentType: 'application/json',
-        accept: 'application/json',
-        body: JSON.stringify({
-          anthropic_version: 'bedrock-2023-05-31',
-          max_tokens: 1024,
-          system,
-          messages: [{ role: 'user', content: user }],
-        }),
-      }),
-    );
-
-    bedrockDurationMs = Date.now() - bedrockStart;
-    emitMetric('BedrockLatency', bedrockDurationMs, 'Milliseconds', { agent: 'funny-text' });
-    reqLog.info('Bedrock Haiku - funny-text', { duration_ms: bedrockDurationMs });
-
-    const responseBody = JSON.parse(new TextDecoder().decode(response.body)) as {
-      content: Array<{ type: string; text: string }>;
-    };
-    funnyText = responseBody.content.find((c) => c.type === 'text')?.text?.trim() ?? '';
-  } catch (err) {
-    bedrockDurationMs = Date.now() - bedrockStart;
-    const isThrottle =
-      err instanceof Error &&
-      (err.name === 'ThrottlingException' || err.message.includes('throttl'));
-    if (isThrottle) {
-      reqLog.warn('Bedrock throttled on funny-text agent', {
-        duration_ms: bedrockDurationMs,
-        error: (err as Error).message,
-      });
-      emitMetric('BedrockThrottled', 1, 'Count', { agent: 'funny-text' });
-    } else {
-      reqLog.error('Bedrock invocation failed on funny-text agent', {
-        duration_ms: bedrockDurationMs,
-        error: (err as Error).message,
-      });
-    }
-    throw err;
-  }
+  const funnyText = (await callBedrock({ system, user, agent: 'funny-text', log: reqLog })).trim();
 
   if (!funnyText) {
     throw new Error('Agent2_FunnyText: Bedrock returned empty text');
   }
 
-  reqLog.info('Funny text generated', { length: funnyText.length, bedrockDurationMs });
+  reqLog.info('Funny text generated', { length: funnyText.length });
 
   if (input.executionArn) await reportStage(input.executionArn, 'text', 'done');
   return { funnyText };
