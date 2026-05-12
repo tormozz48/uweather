@@ -26,6 +26,8 @@ export {
   buildImageCacheKey,
   buildS3ImageKey,
   getTempBucket,
+  degreesToCardinal,
+  stripMarkdownFence,
 } from './utils/index.js';
 
 export type {

@@ -7,9 +7,9 @@ interface WeatherCardProps {
 }
 
 export function WeatherCard({ forecast }: WeatherCardProps) {
-  const w = forecast.weather;
-  const emoji = CONDITION_EMOJI[w.condition] ?? '🌡️';
-  const conditionLabel = w.condition.replace('_', ' ');
+  const weather = forecast.weather;
+  const emoji = CONDITION_EMOJI[weather.condition] ?? '🌡️';
+  const conditionLabel = weather.condition.replace('_', ' ');
 
   return (
     <div className="weather-card">
@@ -24,17 +24,17 @@ export function WeatherCard({ forecast }: WeatherCardProps) {
       </div>
 
       <div className="weather-card__temps">
-        <span className="weather-card__temp">{Math.round(w.temperature)}°C</span>
-        <span className="weather-card__feels-like">feels like {Math.round(w.feelsLike)}°C</span>
+        <span className="weather-card__temp">{Math.round(weather.temperature)}°C</span>
+        <span className="weather-card__feels-like">feels like {Math.round(weather.feelsLike)}°C</span>
       </div>
 
       <div className="weather-card__stats">
-        <Stat icon="💧" label="Humidity" value={`${w.humidity}%`} />
-        <Stat icon="💨" label="Wind" value={`${Math.round(w.windSpeed)} km/h ${w.windDirection}`} />
-        {w.precipitation > 0 && (
-          <Stat icon="🌂" label="Rain" value={`${w.precipitation.toFixed(1)} mm`} />
+        <Stat icon="💧" label="Humidity" value={`${weather.humidity}%`} />
+        <Stat icon="💨" label="Wind" value={`${Math.round(weather.windSpeed)} km/h ${weather.windDirection}`} />
+        {weather.precipitation > 0 && (
+          <Stat icon="🌂" label="Rain" value={`${weather.precipitation.toFixed(1)} mm`} />
         )}
-        {w.uvIndex > 0 && <Stat icon="🔆" label="UV Index" value={String(w.uvIndex)} />}
+        {weather.uvIndex > 0 && <Stat icon="🔆" label="UV Index" value={String(weather.uvIndex)} />}
       </div>
     </div>
   );

@@ -5,6 +5,40 @@ import { dynamo } from './db-client.js';
 
 type UserUpdates = Partial<Pick<UserProfile, 'language' | 'city' | 'country'>>;
 
+interface UpdateExpression {
+  expression: string;
+  names: Record<string, string>;
+  values: Record<string, string>;
+}
+
+/**
+ * Build a DynamoDB SET expression for the given user field updates.
+ * Always includes a lastActiveAt refresh — callers do not need to add it.
+ */
+function buildUpdateExpression(updates: UserUpdates, now: string): UpdateExpression {
+  const parts: string[] = ['#lastActive = :now'];
+  const names: Record<string, string> = { '#lastActive': 'lastActiveAt' };
+  const values: Record<string, string> = { ':now': now };
+
+  if (updates.language) {
+    parts.push('#lang = :lang');
+    names['#lang'] = 'language';
+    values[':lang'] = updates.language;
+  }
+  if (updates.city) {
+    parts.push('#city = :city');
+    names['#city'] = 'city';
+    values[':city'] = updates.city;
+  }
+  if (updates.country) {
+    parts.push('#country = :country');
+    names['#country'] = 'country';
+    values[':country'] = updates.country;
+  }
+
+  return { expression: `SET ${parts.join(', ')}`, names, values };
+}
+
 /**
  * UserService — high-level access to the Users DynamoDB table.
  *
@@ -46,32 +80,13 @@ export class UserService {
     platformId: string | number,
     updates: UserUpdates,
   ): Promise<void> {
-    const now = new Date().toISOString();
-    const updateParts: string[] = ['#lastActive = :now'];
-    const names: Record<string, string> = { '#lastActive': 'lastActiveAt' };
-    const values: Record<string, string> = { ':now': now };
-
-    if (updates.language) {
-      updateParts.push('#lang = :lang');
-      names['#lang'] = 'language';
-      values[':lang'] = updates.language;
-    }
-    if (updates.city) {
-      updateParts.push('#city = :city');
-      names['#city'] = 'city';
-      values[':city'] = updates.city;
-    }
-    if (updates.country) {
-      updateParts.push('#country = :country');
-      names['#country'] = 'country';
-      values[':country'] = updates.country;
-    }
+    const { expression, names, values } = buildUpdateExpression(updates, new Date().toISOString());
 
     await dynamo.send(
       new UpdateCommand({
         TableName: Resource.Users.name,
         Key: { pk: this.buildPk(platform, platformId), sk: 'PROFILE' },
-        UpdateExpression: `SET ${updateParts.join(', ')}`,
+        UpdateExpression: expression,
         ExpressionAttributeNames: names,
         ExpressionAttributeValues: values,
       }),

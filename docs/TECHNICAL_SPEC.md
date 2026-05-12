@@ -27,7 +27,7 @@ Stores completed forecast results. Supports user history and image reuse.
 |-----------|------|-----|-------------|
 | `pk` | String | PK | `FORECAST#{forecastId}` (ULID) |
 | `sk` | String | SK | `META` |
-| `userId` | String | — | Telegram chatId or web sessionId |
+| `userId` | String | — | Web session ID |
 | `city` | String | — | Normalized city name |
 | `country` | String | — | Country code |
 | `date` | String | — | `YYYY-MM-DD` |
@@ -56,15 +56,28 @@ Stores completed forecast results. Supports user history and image reuse.
 
 | Attribute | Type | Key | Description |
 |-----------|------|-----|-------------|
-| `pk` | String | PK | `USER#{platform}#{platformId}` (e.g. `USER#telegram#123456`) |
+| `pk` | String | PK | `USER#web#{sessionId}` |
 | `sk` | String | SK | `PROFILE` |
-| `platform` | String | — | telegram \| web |
-| `chatId` | String | — | Telegram chat ID (null for web) |
+| `platform` | String | — | `web` |
 | `language` | String | — | Preferred language (ISO 639-1) |
 | `city` | String | — | Last used city |
 | `country` | String | — | Last used country |
 | `createdAt` | String | — | ISO 8601 |
 | `lastActiveAt` | String | — | ISO 8601 |
+
+### 1.4 WebSocketConnections
+
+Maps Step Functions execution ARNs to active WebSocket connection IDs for real-time progress push. TTL-based cleanup (10 minutes).
+
+| Attribute | Type | Key | Description |
+|-----------|------|-----|-------------|
+| `pk` | String | PK | `executionArn` |
+| `sk` | String | SK | `connectionId` |
+| `ttl` | Number | — | Unix epoch seconds, 10 min from connect time |
+
+**Access patterns:**
+- Look up all connections for an execution: `pk = {executionArn}` → push progress to each connection
+- Automatic cleanup via DynamoDB TTL
 
 ## 2. Image Cache Key Strategy
 
@@ -104,17 +117,25 @@ All served via API Gateway HTTP API.
 
 | Method | Path | Description | Query Params |
 |--------|------|-------------|--------------|
-| GET | `/forecast` | Get today's forecast | `city` (required), `lang` (optional, default `en`) |
+| GET | `/forecast` | Start pipeline, return execution handle | `city` (required), `lang` (optional, default `en`) |
+| GET | `/forecast/status` | Poll pipeline status / get completed result | `executionArn` (required) |
 | GET | `/history` | Get past forecasts | `userId` (required), `limit` (optional, default 10) |
 | GET | `/health` | Health check | — |
 
-### Internal (Telegram webhook)
+### Response format — `/forecast` (202 Accepted)
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/telegram/webhook` | Telegram bot webhook endpoint |
+Returns immediately with an execution handle the client uses for polling or WebSocket subscription:
 
-### Response format (forecast)
+```json
+{
+  "status": "pending",
+  "executionArn": "arn:aws:states:eu-west-1:123:execution:ForecastPipeline:kyiv-2026-05-09-uuid",
+  "city": "Kyiv",
+  "language": "en"
+}
+```
+
+### Response format — `/forecast/status` (200 OK — complete)
 
 ```json
 {
@@ -139,75 +160,97 @@ All served via API Gateway HTTP API.
 }
 ```
 
+### Response format — `/forecast/status` (202 Accepted — still running)
+
+```json
+{ "status": "pending" }
+```
+
 ## 4. Step Functions State Machine
 
 ```
 StartExecution
 │
 ├─ CheckCache (Lambda)
-│  ├─ CACHE HIT → SkipToAgents
+│  ├─ CACHE HIT → NormalizeFromCache
 │  └─ CACHE MISS ↓
 │
 ├─ FetchWeather (Parallel)
 │  ├─ OpenWeatherLambda
 │  ├─ WeatherAPILambda
 │  └─ OpenMeteoLambda
-│  (each writes to WeatherCache, has individual error handling + retry)
+│  (each writes to WeatherCache; retry 2× on any error, catch into Pass so parallel can complete)
 │
-├─ NormalizeAndMerge (Pass state — combine outputs)
+├─ NormalizeFromFetch (Pass state — merge parallel outputs into flat structure)
 │
 ├─ Agent1_Compare (Lambda → Bedrock Haiku)
-│  └─ Output: UnifiedForecast
+│  └─ Output: ConsensusForecast
 │
-├─ Agent2_FunnyText (Lambda → Bedrock Haiku)
-│  └─ Output: localized funny text
+├─ ResolveLandmark (Lambda → Wikidata SPARQL + Bedrock Haiku fallback)
+│  └─ Output: landmark names for the city (injected into Agent 2 prompt)
 │
-├─ CheckImageCache (Lambda)
-│  ├─ IMAGE CACHE HIT → SkipImageGen
-│  └─ IMAGE CACHE MISS ↓
+├─ ParallelAgents (Parallel — runs Agent2 and image cache lookup concurrently)
+│  ├─ Branch A: Agent2_FunnyText (Lambda → Bedrock Haiku)
+│  │  └─ Output: localized funny text
+│  └─ Branch B: CheckImageCache (Lambda)
+│     ├─ IMAGE CACHE HIT → NormalizeImageFromCache
+│     └─ IMAGE CACHE MISS → Agent3_ImageGen (Lambda → Pixazo SDXL API → S3)
+│        └─ Output: CloudFront image URL
 │
-├─ Agent3_ImageGen (Lambda → Bedrock Titan)
-│  └─ Output: S3 image URL
+├─ NormalizeParallelResults (Pass state — merge funny text + image URL)
 │
 ├─ SaveForecast (Lambda → DynamoDB Forecasts table)
 │
-└─ SendResponse (Lambda → Telegram API or API response)
+└─ PipelineSuccess (Pass state — signals completion)
 ```
+
+### Real-time progress events
+
+Each Lambda emits a `StageProgress` event to EventBridge (`uweather.pipeline` source) on start and completion. A dedicated `wsPushStage` Lambda receives these events plus built-in Step Functions status events (SUCCEEDED, FAILED, TIMED_OUT) and pushes them to all connected WebSocket clients via the `WebSocketConnections` table.
 
 ### Error handling
 
 - Each weather provider: retry 2× with exponential backoff, then continue with remaining providers (minimum 2 of 3 must succeed)
-- Bedrock calls: retry 2× on throttling (429), fail on other errors
-- Individual Lambda timeout: 90 seconds (Bedrock calls can be slow)
-- Full pipeline timeout: 120 seconds
-- On failure: send user-friendly error message, log full error context
+- Bedrock calls: retry 2× on ThrottlingException only, fail on other errors
+- ResolveLandmark: retry 1× on any error, fall back to generic landmark if Wikidata fails
+- Pixazo (image gen): retry 2× with backoff
+- Individual Lambda timeout: 30–90 seconds depending on function
+- Full pipeline timeout: 300 seconds
+- On failure: Step Functions FAILED event triggers WebSocket push to client
 
 ## 5. AI Agent Prompt Design
 
-All prompts live in `packages/core/src/prompts/`. Each is a TypeScript function that returns a structured prompt.
+All prompt templates live in `packages/core/src/prompts/`. Each is a TypeScript function that returns a structured prompt string.
 
 ### Agent 1: Weather Comparison
 
 **Input**: Array of `UnifiedWeatherData` from 2–3 providers
 **Output**: Single `ConsensusForecast` JSON
 
-System prompt focus: Compare numeric values across providers, compute weighted averages (weight by historical accuracy if available, else equal), flag significant disagreements (>5°C temp difference, conflicting conditions), produce a single consensus forecast.
+System prompt focus: Compare numeric values across providers, compute weighted averages (equal weight by default), flag significant disagreements (>5°C temp difference, conflicting conditions), produce a single consensus forecast.
+
+### ResolveLandmark
+
+**Input**: City name, country code
+**Output**: Array of 3–5 landmark names
+
+Primary: Wikidata SPARQL query for well-known places in the city. Fallback: Bedrock Haiku prompt listing notable landmarks. Result injected into Agent 2's prompt.
 
 ### Agent 2: Funny Text
 
-**Input**: `ConsensusForecast`, city name, country, language code, recent forecast history for this city (last 5, to avoid repetition)
+**Input**: `ConsensusForecast`, city name, country, language code, landmark names, recent forecast history for this city (last 5, to avoid repetition)
 **Output**: String (2–3 paragraphs)
 
-System prompt focus: Write a humorous weather report referencing local landmarks, cultural facts, or seasonal events for the user's city. Translate to the requested language. Avoid repeating facts/landmarks from recent history. Include practical recommendations (what to wear, whether to carry an umbrella). Tone: friendly, witty, informative.
+System prompt focus: Write a humorous weather report referencing the provided landmarks and cultural facts. Translate to the requested language. Avoid repeating landmarks from recent history. Include practical recommendations (what to wear, whether to carry an umbrella). Tone: friendly, witty, informative.
 
 ### Agent 3: Image Generation
 
-**Input**: `ConsensusForecast`, city name, time of day
-**Output**: Base64 image (PNG)
+**Input**: `ConsensusForecast`, city name, time of day, landmark names
+**Output**: PNG image uploaded to S3, CloudFront URL returned
 
-Prompt focus: Generate a stylized illustration showing the city's recognizable skyline or landmark with the current weather conditions. Style: colorful, friendly, slightly cartoonish. Include visual weather indicators (sun, clouds, rain, etc.). Time-of-day lighting (golden morning, bright afternoon, warm evening, dark night).
+Uses Pixazo SDXL API (`gateway.pixazo.ai`). Positive prompt: stylized illustration showing the city's recognizable skyline or landmark with current weather conditions. Style: colorful, friendly, slightly cartoonish. Time-of-day lighting. Negative prompt: suppresses photorealism, people, text overlays.
 
-## 6. Unified Weather Data Type
+## 6. Core Types
 
 ```typescript
 interface UnifiedWeatherData {
@@ -218,7 +261,7 @@ interface UnifiedWeatherData {
   fetchedAt: string;               // ISO 8601
   temperature: number;             // Celsius
   feelsLike: number;               // Celsius
-  humidity: number;                 // percentage 0-100
+  humidity: number;                // percentage 0-100
   windSpeed: number;               // km/h
   windDirection: string;           // cardinal (N, NE, E, etc.)
   condition: WeatherCondition;     // normalized enum
@@ -248,6 +291,39 @@ interface ConsensusForecast extends Omit<UnifiedWeatherData, 'provider' | 'fetch
 }
 ```
 
+### Pipeline stage types (real-time progress)
+
+```typescript
+type PipelineStageId =
+  | 'cache'
+  | 'fetch_openweather'
+  | 'fetch_weatherapi'
+  | 'fetch_openmeteo'
+  | 'compare'
+  | 'landmark'
+  | 'text'
+  | 'image_cache'
+  | 'image_gen'
+  | 'save';
+
+interface StageProgressMessage {
+  stageId: PipelineStageId;
+  status: 'started' | 'completed' | 'failed';
+  executionArn: string;
+  timestamp: string;  // ISO 8601
+}
+
+// Frontend mapping — raw stages collapsed into 7 visual groups
+const VISUAL_STAGES = {
+  weather: ['cache', 'fetch_openweather', 'fetch_weatherapi', 'fetch_openmeteo'],
+  compare: ['compare'],
+  landmark: ['landmark'],
+  text: ['text'],
+  image: ['image_cache', 'image_gen'],
+  save: ['save'],
+};
+```
+
 ## 7. Observability Plan
 
 ### Structured Log Format
@@ -262,61 +338,63 @@ Every Lambda log entry includes:
   "function": "provider-openweather",
   "requestId": "abc-123",
   "correlationId": "xyz-789",
-  "userId": "telegram#123456",
   "city": "kyiv",
   "duration_ms": 234,
   "message": "Weather data fetched successfully"
 }
 ```
 
-### Custom CloudWatch Metrics
+### Custom CloudWatch Metrics (EMF)
 
 | Metric | Unit | Dimensions |
 |--------|------|------------|
-| `WeatherCacheHitRate` | Percent | city |
-| `ImageCacheHitRate` | Percent | city |
-| `ProviderLatency` | Milliseconds | provider |
-| `ProviderErrorRate` | Percent | provider |
-| `BedrockLatency` | Milliseconds | model, agent |
-| `ForecastE2ELatency` | Milliseconds | — |
-| `StepFunctionDuration` | Milliseconds | — |
-| `ImageGenerationCount` | Count | — |
+| `WeatherCacheHit` / `WeatherCacheMiss` | Count | — |
+| `ImageCacheHit` / `ImageCacheMiss` / `ImageGenerationCount` | Count | — |
+| `ProviderSuccess` / `ProviderError` | Count | provider |
+| `BedrockLatency` | Milliseconds | agent |
+| `BedrockThrottled` | Count | agent |
+| `LowConfidenceForecast` | Count | — |
+| `ProviderCount` | Count | — |
 
 ### Dashboard Panels
 
 Single CloudWatch dashboard `uweather-{stage}`:
 
-1. Request volume (time series)
-2. Cache efficiency — weather + image hit rates (time series)
-3. Provider health — 3 panels with latency + error rate
-4. AI pipeline — Bedrock latency by agent (time series)
-5. End-to-end forecast latency (p50, p90, p99)
-6. Error rate (time series)
-7. Estimated daily cost (based on invocation counts)
+1. Step Functions executions (succeeded, failed, throttled)
+2. Weather cache hit/miss counts (time series)
+3. Image cache hit/miss/generated counts (time series)
+4. Provider reliability — success/error per provider
+5. Bedrock latency — P50/P95 per agent (compare, funny-text)
+6. Bedrock throttling + forecast quality (LowConfidenceForecast count)
+7. API Gateway errors (4xx / 5xx / total requests)
 
 ### Alarms
 
 | Alarm | Threshold | Action |
 |-------|-----------|--------|
-| ProviderErrorRate | > 5% over 5 min | SNS → Email |
-| StepFunctionFailureRate | > 1% over 15 min | SNS → Email |
-| LambdaDuration | > 75s (of 90s timeout) | SNS → Email |
+| SFN ExecutionsFailed | ≥ 1 in evaluation period | SNS → Email |
+| ProviderError | > 5 errors in 5 min | SNS → Email |
+| OrchestratorDuration (P99) | > 25 seconds | SNS → Email |
 | BedrockThrottling | > 3 events in 5 min | SNS → Email |
 
 ### X-Ray Tracing
 
-Enabled on: API Gateway, all Lambda functions. Traces full request path from API Gateway → Orchestrator → Step Functions → individual Lambdas → Bedrock API calls.
+Enabled on all Lambda functions (Active mode) and the Step Functions state machine. Traces full request path from API Gateway → Orchestrator → Step Functions → individual Lambdas → Bedrock API calls.
+
+### CloudWatch Log Retention
+
+All Lambda log groups: 30-day retention. Step Functions execution logs (ERROR level): 30-day retention.
 
 ## 8. Cost Model (MVP, ~500 requests/day)
 
 | Service | Monthly Estimate | Notes |
 |---------|-----------------|-------|
 | Lambda | ~$0 | Free tier (1M req/mo) |
-| API Gateway | ~$0.50 | HTTP API pricing |
+| API Gateway | ~$0.50 | HTTP API + WebSocket API |
 | Step Functions | ~$0.75 | Standard workflows |
-| DynamoDB | ~$2–5 | On-demand, 3 tables |
-| Bedrock Haiku (text) | ~$3–5 | 2 calls × 500/day |
-| Bedrock Titan (images) | ~$5–24 | Depends on cache hit rate |
+| DynamoDB | ~$2–5 | On-demand, 4 tables |
+| Bedrock Haiku (text) | ~$3–5 | 2 calls × 500/day (compare + landmark fallback) |
+| Pixazo SDXL (images) | Depends on cache hit rate | External API pricing |
 | S3 | ~$0.50 | Image storage |
 | CloudFront | ~$1 | Image delivery |
 | CloudWatch | ~$3–5 | Logs, metrics, dashboard |

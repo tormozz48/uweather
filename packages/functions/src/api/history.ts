@@ -5,10 +5,14 @@ import { jsonBadRequest, jsonOk, jsonServerError, toForecastResponse } from './u
 
 const log = createLogger({ function: 'api-history' });
 
-/** Clamp and parse the `limit` query param: integer in [1, 50], default 10. */
+const MIN_HISTORY_LIMIT = 1;
+const MAX_HISTORY_LIMIT = 50;
+const DEFAULT_HISTORY_LIMIT = 10;
+
+/** Clamp and parse the `limit` query param: integer in [MIN, MAX], default DEFAULT. */
 function parseLimit(raw: string | undefined): number {
-  const parsed = Number.parseInt(raw ?? '10', 10);
-  return Math.min(50, Math.max(1, Number.isNaN(parsed) ? 10 : parsed));
+  const parsed = Number.parseInt(raw ?? String(DEFAULT_HISTORY_LIMIT), 10);
+  return Math.min(MAX_HISTORY_LIMIT, Math.max(MIN_HISTORY_LIMIT, Number.isNaN(parsed) ? DEFAULT_HISTORY_LIMIT : parsed));
 }
 
 /**

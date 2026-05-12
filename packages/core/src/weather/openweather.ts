@@ -4,6 +4,7 @@
  */
 import type { UnifiedWeatherData, WeatherCondition } from '../types/weather.js';
 import { toDateString } from '../utils/time.js';
+import { degreesToCardinal } from '../utils/wind.js';
 
 // ── Internal API response types ──────────────────────────────────────────────
 
@@ -52,13 +53,6 @@ function mapOWMCondition(weatherId: number): WeatherCondition {
   if (weatherId === 801 || weatherId === 802) return 'partly_cloudy'; // Few / scattered clouds
   if (weatherId >= 803) return 'cloudy'; // Broken / overcast
   return 'cloudy';
-}
-
-// ── Shared utility ────────────────────────────────────────────────────────────
-
-function degreesToCardinal(deg: number): string {
-  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-  return dirs[Math.round(deg / 45) % 8] ?? 'N';
 }
 
 // ── Transformer ───────────────────────────────────────────────────────────────

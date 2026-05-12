@@ -1,5 +1,10 @@
 export type TimeSlot = 'morning' | 'afternoon' | 'evening' | 'night';
 
+const MORNING_START_HOUR = 5;
+const AFTERNOON_START_HOUR = 12;
+const EVENING_START_HOUR = 17;
+const NIGHT_START_HOUR = 21;
+
 /**
  * Derive a time slot from an hour (0-23) in the city's local time.
  *
@@ -9,9 +14,9 @@ export type TimeSlot = 'morning' | 'afternoon' | 'evening' | 'night';
  * night:     21:00–04:59
  */
 export function getTimeSlot(hour: number): TimeSlot {
-  if (hour >= 5 && hour < 12) return 'morning';
-  if (hour >= 12 && hour < 17) return 'afternoon';
-  if (hour >= 17 && hour < 21) return 'evening';
+  if (hour >= MORNING_START_HOUR && hour < AFTERNOON_START_HOUR) return 'morning';
+  if (hour >= AFTERNOON_START_HOUR && hour < EVENING_START_HOUR) return 'afternoon';
+  if (hour >= EVENING_START_HOUR && hour < NIGHT_START_HOUR) return 'evening';
   return 'night';
 }
 

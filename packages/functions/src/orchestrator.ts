@@ -20,6 +20,9 @@ import type { Context } from 'aws-lambda';
 const sfn = new SFNClient({});
 const log = createLogger({ function: 'orchestrator' });
 
+/** Length of the UUID suffix in Step Functions execution names (must be unique). */
+const EXECUTION_NAME_UUID_SUFFIX_LENGTH = 8;
+
 export interface OrchestratorInput {
   city: string;
   language?: string;
@@ -64,7 +67,7 @@ export async function handler(
   if (!stateMachineArn) throw new Error('STATE_MACHINE_ARN environment variable is not set');
 
   // Execution name must be unique and match [a-zA-Z0-9_-]+, max 80 chars
-  const executionName = `${cityNormalized.replace(/[^a-z0-9]/g, '-')}-${date}-${randomUUID().slice(0, 8)}`;
+  const executionName = `${cityNormalized.replace(/[^a-z0-9]/g, '-')}-${date}-${randomUUID().slice(0, EXECUTION_NAME_UUID_SUFFIX_LENGTH)}`;
 
   const execution = await sfn.send(
     new StartExecutionCommand({

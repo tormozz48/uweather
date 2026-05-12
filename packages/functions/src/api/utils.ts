@@ -16,21 +16,21 @@ import { forecastService } from '../services/index.js';
 
 /** Map a stored ForecastResult to the public API response shape. */
 export function toForecastResponse(forecast: ForecastResult): ForecastResponse {
-  const w = forecast.weatherSummary;
+  const weatherSummary = forecast.weatherSummary;
   return {
     forecastId: forecast.forecastId,
     city: forecast.city,
     country: forecast.country,
     date: forecast.date,
     weather: {
-      temperature: w.temperature,
-      feelsLike: w.feelsLike,
-      condition: w.condition,
-      humidity: w.humidity,
-      windSpeed: w.windSpeed,
-      windDirection: w.windDirection,
-      precipitation: w.precipitation,
-      uvIndex: w.uvIndex,
+      temperature: weatherSummary.temperature,
+      feelsLike: weatherSummary.feelsLike,
+      condition: weatherSummary.condition,
+      humidity: weatherSummary.humidity,
+      windSpeed: weatherSummary.windSpeed,
+      windDirection: weatherSummary.windDirection,
+      precipitation: weatherSummary.precipitation,
+      uvIndex: weatherSummary.uvIndex,
     },
     funnyText: forecast.funnyText,
     imageUrl: forecast.imageUrl,

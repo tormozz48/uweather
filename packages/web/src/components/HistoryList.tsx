@@ -13,15 +13,15 @@ export function HistoryList({ forecasts, onSelect }: HistoryListProps) {
     <section className="history">
       <h3 className="history__title">Recent forecasts</h3>
       <ul className="history__list">
-        {forecasts.map((f) => {
-          const emoji = CONDITION_EMOJI[f.weather.condition] ?? '🌡️';
+        {forecasts.map((forecast) => {
+          const emoji = CONDITION_EMOJI[forecast.weather.condition] ?? '🌡️';
           return (
-            <li key={f.forecastId} className="history__item">
-              <button type="button" className="history__item-btn" onClick={() => onSelect(f)}>
+            <li key={forecast.forecastId} className="history__item">
+              <button type="button" className="history__item-btn" onClick={() => onSelect(forecast)}>
                 <span className="history__emoji">{emoji}</span>
-                <span className="history__city">{f.city}</span>
-                <span className="history__date">{f.date}</span>
-                <span className="history__temp">{Math.round(f.weather.temperature)}°C</span>
+                <span className="history__city">{forecast.city}</span>
+                <span className="history__date">{forecast.date}</span>
+                <span className="history__temp">{Math.round(forecast.weather.temperature)}°C</span>
               </button>
             </li>
           );

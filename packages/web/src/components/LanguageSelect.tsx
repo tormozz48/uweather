@@ -14,9 +14,9 @@ export function LanguageSelect({ lang, isLoading, onLangChange }: LanguageSelect
       onChange={(e) => onLangChange(e.target.value)}
       disabled={isLoading}
     >
-      {LANGUAGES.map((l) => (
-        <option key={l.code} value={l.code}>
-          {l.label}
+      {LANGUAGES.map((language) => (
+        <option key={language.code} value={language.code}>
+          {language.label}
         </option>
       ))}
     </select>

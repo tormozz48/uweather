@@ -16,6 +16,12 @@ const log = createLogger({ function: 'agent-image-gen' });
 
 const PIXAZO_SDXL_URL = 'https://gateway.pixazo.ai/getImage/v1/getSDXLImage';
 
+const SDXL_IMAGE_HEIGHT = 1024;
+const SDXL_IMAGE_WIDTH = 1024;
+const SDXL_NUM_STEPS = 20;
+const SDXL_GUIDANCE_SCALE = 7;
+const S3_IMAGE_CACHE_CONTROL = 'public, max-age=86400'; // 24-hour browser cache
+
 export interface ImageGenInput {
   city: string;
   date: string;
@@ -45,10 +51,10 @@ async function generateImageWithPixazo(prompt: string, negativePrompt: string): 
     body: JSON.stringify({
       prompt,
       negative_prompt: negativePrompt,
-      height: 1024,
-      width: 1024,
-      num_steps: 20,
-      guidance_scale: 7,
+      height: SDXL_IMAGE_HEIGHT,
+      width: SDXL_IMAGE_WIDTH,
+      num_steps: SDXL_NUM_STEPS,
+      guidance_scale: SDXL_GUIDANCE_SCALE,
     }),
   });
 
@@ -94,7 +100,7 @@ async function uploadToS3(
       Key: s3Key,
       Body: imageBuffer,
       ContentType: contentType,
-      CacheControl: 'public, max-age=86400', // 24-hour browser cache
+      CacheControl: S3_IMAGE_CACHE_CONTROL,
     }),
   );
   return `${Resource.ImagesCdn.url}/${s3Key}`;

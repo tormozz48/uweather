@@ -13,6 +13,9 @@ import { createLogger, emitMetric } from '@uweather/core';
 /** Inference profile ID for Claude Haiku 4.5 (required for on-demand throughput). */
 export const HAIKU_MODEL_ID = 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
 
+/** Default max output tokens for Bedrock text generation calls. */
+const DEFAULT_BEDROCK_MAX_TOKENS = 1024;
+
 const bedrock = new BedrockRuntimeClient({});
 
 export interface CallBedrockOptions {
@@ -20,7 +23,7 @@ export interface CallBedrockOptions {
   user: string;
   /** Dimension value used for BedrockLatency and BedrockThrottled metrics (e.g. 'compare'). */
   agent: string;
-  maxTokens?: number;
+  maxTokens?: number; // defaults to DEFAULT_BEDROCK_MAX_TOKENS
   /** Child logger from the calling Lambda — keeps requestId/city context in log lines. */
   log: ReturnType<ReturnType<typeof createLogger>['child']>;
 }
@@ -36,7 +39,7 @@ export async function callBedrock({
   system,
   user,
   agent,
-  maxTokens = 1024,
+  maxTokens = DEFAULT_BEDROCK_MAX_TOKENS,
   log,
 }: CallBedrockOptions): Promise<string> {
   const bedrockStart = Date.now();

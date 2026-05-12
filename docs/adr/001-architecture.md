@@ -1,8 +1,8 @@
 # ADR-001: uweather Architecture
 
 **Date**: 2026-05-09
-**Status**: Accepted
-**Confidence**: High confidence (minor unknowns around Titan Image quality)
+**Status**: Accepted (updated 2026-05-12 to reflect implementation)
+**Confidence**: High confidence
 
 ## Problem
 
@@ -26,7 +26,7 @@ We need to design a serverless architecture for uweather — an AI-powered weath
 | R2 | AI Agent 1: compare/average provider data | Must |
 | R3 | AI Agent 2: funny localized text with landmarks | Must |
 | R4 | AI Agent 3: generate unique weather image | Must |
-| R5 | Telegram bot interface (webhook) | Must |
+| R5 | Telegram bot interface (webhook) | Deferred post-MVP |
 | R6 | Web SPA interface (anonymous) | Must |
 | R7 | All TypeScript/Node.js | Must |
 | R8 | AWS serverless infrastructure | Must |
@@ -74,14 +74,14 @@ DynamoDB with a 30-minute TTL on the WeatherCache table. At this scale, ElastiCa
 
 When ElastiCache would make sense: if cache read latency becomes critical (sub-millisecond needed) or request volume exceeds thousands per minute.
 
-### 5. AI Models: Amazon Bedrock
+### 5. AI Models: Amazon Bedrock (text) + Pixazo SDXL (images)
 
-- **Agents 1 & 2 (text)**: Claude 3.5 Haiku via Bedrock — ~$0.25/1M input tokens, ~$1.25/1M output tokens. Fast, cheap, strong at structured analysis and creative writing.
-- **Agent 3 (image)**: Amazon Titan Image Generator v2 — ~$0.008 per 512×512 image. Cheapest image generation on Bedrock.
+- **Agents 1, 2 & landmark resolution (text)**: Claude Haiku 4.5 via Bedrock — ~$0.25/1M input tokens, ~$1.25/1M output tokens. Fast, cheap, strong at structured analysis and creative writing.
+- **Agent 3 (image)**: Pixazo SDXL API (`gateway.pixazo.ai`) — external REST API, higher image quality than Bedrock Titan at comparable cost. Requires `PixazoApiKey` SST Secret.
 
-All accessed via Bedrock API (no self-hosted models, no external API keys for AI). IAM roles handle auth.
+Text models accessed via Bedrock IAM roles (no API key management). Image generation via external API key.
 
-When upgrading would make sense: if Titan image quality is insufficient, upgrade to Stable Diffusion XL on Bedrock (~$0.04/image, 5× cost). If text quality needs improvement, upgrade to Claude 3.5 Sonnet.
+When upgrading would make sense: if text quality needs improvement, upgrade to Claude Sonnet. If Pixazo pricing becomes unfavorable, Stable Diffusion XL is also available on Bedrock directly.
 
 ### 6. Image Caching Strategy
 
@@ -103,9 +103,9 @@ Three separate tables (detailed schemas in TECHNICAL_SPEC.md):
 
 Multi-table chosen over single-table design for clarity and independent scaling. At this scale, the operational overhead of multiple tables is negligible.
 
-### 8. Telegram Bot: grammY (Webhook Mode)
+### 8. Telegram Bot: Deferred
 
-grammY is TypeScript-native, lightweight, and designed for serverless (webhook mode). The bot uses "send loading message → edit with result" UX pattern. Compared to Telegraf (heavier, older API), grammY has better TypeScript support and smaller bundle size.
+Telegram bot integration is explicitly deferred post-MVP. All user-facing interaction happens through the web SPA for the initial launch. See Out of Scope section.
 
 ### 9. Web App: Vite + React SPA
 
@@ -113,26 +113,36 @@ Static SPA deployed to S3 + CloudFront via SST's `StaticSite` construct. Anonymo
 
 ### 10. Observability
 
-- **CloudWatch Logs**: structured JSON logging via Powertools for AWS Lambda (TypeScript)
-- **CloudWatch Metrics**: custom metrics (cache hit rate, provider latency, Bedrock latency, e2e forecast time)
-- **CloudWatch Dashboard**: single dashboard with provider health, AI pipeline latency, error rates, cost tracking
-- **CloudWatch Alarms**: error rate >5%, Step Functions failure >1%, Lambda near-timeout (>75s of 90s). Notify via SNS → email
-- **X-Ray**: distributed tracing across all Lambdas and API Gateway
+- **CloudWatch Logs**: structured JSON logging with custom `createLogger()` utility; 30-day retention on all log groups
+- **CloudWatch Metrics**: EMF-based custom metrics (cache hit/miss, provider success/error, Bedrock latency, image generation count)
+- **CloudWatch Dashboard**: single dashboard with 7 panels — Step Functions health, weather/image cache efficiency, provider reliability, Bedrock latency, API errors
+- **CloudWatch Alarms**: SFN any failure, >5 provider errors in 5 min, orchestrator P99 >25s, Bedrock throttling >3/5min. Notify via SNS → email (andrii@numica.com)
+- **X-Ray**: Active tracing on all Lambdas and Step Functions state machine
+
+### 11. Real-time Pipeline Progress: WebSocket + EventBridge
+
+Each pipeline Lambda emits a `StageProgress` event to EventBridge as it starts and completes. A dedicated `wsPushStage` Lambda subscribes to two EventBridge sources — custom stage events and built-in Step Functions status changes — and pushes updates to all connected WebSocket clients via `API Gateway WebSocket API`.
+
+Connection state is stored in a `WebSocketConnections` DynamoDB table (execution ARN → connection ID mapping, 10-min TTL). This lets the web SPA show a live progress indicator through each of the 10 pipeline stages without polling.
+
+WebSocket chosen over long-polling because the pipeline takes 15–30 seconds; per-stage granularity (10 stages) significantly reduces perceived wait time.
 
 ## Trade-offs
 
 - **Step Functions over SQS** — we lose true decoupling and event-driven architecture; gain simplicity and synchronous-like flow. Adding scheduled notifications later may require introducing SQS/EventBridge.
 - **DynamoDB over ElastiCache** — slightly higher read latency (~5ms vs <1ms); gain zero fixed cost and serverless model.
-- **Titan Image over SDXL** — lower image quality; gain 5× cost reduction. Can upgrade later without architectural changes.
-- **Bedrock over external APIs (OpenAI)** — limited to Bedrock model catalog; gain single-vendor IAM auth, no API key management, AWS data residency.
+- **Pixazo SDXL over Bedrock Titan** — introduces an external API dependency and key management; gain significantly better image quality, which directly impacts UX.
+- **Bedrock over external APIs (OpenAI) for text** — limited to Bedrock model catalog; gain single-vendor IAM auth, no API key management, AWS data residency.
 - **Multi-table over single-table DynamoDB** — slightly more IaC definitions; gain clarity, simpler access patterns, independent table-level metrics.
+- **WebSocket over polling** — adds infrastructure complexity (WebSocket API, EventBridge rules, push Lambda, connections table); gain real-time per-stage progress UX that substantially reduces perceived latency on a 15–30s pipeline.
 
 ## Out of Scope (MVP)
 
+- **Telegram bot** — deferred post-MVP; infrastructure not deployed (no webhook endpoint, no grammY integration)
 - Scheduled notifications / daily digests (next iteration)
 - Android mobile app (future)
 - User authentication or accounts on web
-- Location knowledge base (rely on LLM training data)
+- Location knowledge base (Wikidata SPARQL + Bedrock serve as the landmark source)
 - Multi-day forecasts (today only for MVP)
 - Rate limiting / abuse protection (not needed at hundreds of users)
 - CI/CD pipeline (manual `sst deploy` for now)

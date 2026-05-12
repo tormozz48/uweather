@@ -9,8 +9,11 @@
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| MVP surface | Telegram + Web simultaneously | Both surfaces are thin clients over the same API; building in parallel has low incremental cost |
+| MVP surface | Web only (Telegram deferred) | Telegram adds complexity without being critical for early validation; web SPA covers the full pipeline |
 | AI agent stubs | None — all real | Each phase delivers real value; Bedrock access must be enabled early |
+| Image generation | Pixazo SDXL (not Bedrock Titan) | Significantly better image quality; trade-off is external API dependency and key management |
+| Real-time UX | WebSocket + EventBridge (not polling) | Pipeline takes 15–30s; per-stage progress updates substantially reduce perceived wait |
+| Landmark resolution | Wikidata SPARQL + Bedrock fallback | Free data source, surprisingly good coverage; Bedrock only activates when Wikidata returns <3 results |
 | Monorepo config | Shared tsconfig with project references | Simpler for project size, still type-safe across packages |
 | Linter/formatter | Biome (strict) | Single tool replacing ESLint + Prettier; Rust-based, fast, simple config |
 | Node.js runtime | Node 20 (LTS) | Battle-tested Lambda support, SST fully supports it |
@@ -137,25 +140,27 @@ Rationale: Biome covers ~95% of ESLint+Prettier needs in a single binary. The ma
 ## Phase 3 — AI Agents Pipeline
 
 **Timeline**: Days 7–10
-**Goal**: Full end-to-end pipeline — weather fetch → AI comparison → funny text → image generation → stored forecast
+**Goal**: Full end-to-end pipeline — weather fetch → AI comparison → landmark resolution → funny text → image generation → stored forecast
 
 ### Prerequisites
 
 - **Enable Bedrock model access** in AWS Console for:
-  - Claude 3.5 Haiku (text generation)
-  - Amazon Titan Image Generator v2 (image generation)
+  - Claude Haiku 4.5 (text generation — compare, funny-text, landmark fallback)
   - Note: approval can take a few hours — request on Day 1
+- **Pixazo API key**: obtain from gateway.pixazo.ai, store as `PixazoApiKey` SST Secret
 
 ### Tasks
 
 1. `packages/core/src/prompts/` — prompt template functions:
    - `compare.ts`: system + user prompt for Agent 1 (weather comparison)
    - `funny-text.ts`: system + user prompt for Agent 2 (localized humor)
-   - `image-gen.ts`: prompt for Agent 3 (Titan image generation)
+   - `image-gen.ts`: positive + negative prompts for Agent 3 (Pixazo SDXL)
+   - `resolve-landmark.ts`: Bedrock fallback prompt for landmark resolution
 2. `packages/functions/src/agents/`:
    - `compare.ts` (Agent 1): invoke Bedrock Haiku, input = array of `UnifiedWeatherData`, output = `ConsensusForecast` JSON
-   - `funny-text.ts` (Agent 2): invoke Bedrock Haiku, input = `ConsensusForecast` + city + language + recent history, output = string (2–3 paragraphs)
-   - `image-gen.ts` (Agent 3): invoke Bedrock Titan Image Gen v2, input = `ConsensusForecast` + city + time slot, output = upload PNG to S3, return CloudFront URL
+   - `resolve-landmark.ts`: primary — Wikidata SPARQL; fallback — Bedrock Haiku. Output: 3–5 landmark names for the city
+   - `funny-text.ts` (Agent 2): invoke Bedrock Haiku, input = `ConsensusForecast` + city + language + landmark names + recent history, output = string (2–3 paragraphs)
+   - `image-gen.ts` (Agent 3): call Pixazo SDXL API, upload PNG to S3, return CloudFront URL
 3. `packages/functions/src/agents/check-image-cache.ts`:
    - Build image cache key from consensus data
    - Query `ImageCacheIndex` GSI on Forecasts table
@@ -164,14 +169,12 @@ Rationale: Biome covers ~95% of ESLint+Prettier needs in a single binary. The ma
    - Write complete `ForecastResult` to Forecasts table
    - Include all fields: weatherSummary, funnyText, imageUrl, imageCacheKey, sourcesUsed
 5. `infra/pipeline.ts` — extend state machine with full flow:
-   - ...existing parallel fetch...
-   - → `Agent1_Compare` → `Agent2_FunnyText` → `CheckImageCache`
-   - → (if miss) `Agent3_ImageGen` → `SaveForecast`
-   - → (if hit) skip image gen → `SaveForecast`
-   - Bedrock calls: retry 2x on throttling (429), fail on other errors
-   - Individual Lambda timeout: 90 seconds
-   - Full pipeline timeout: 120 seconds
-6. IAM: grant Bedrock `InvokeModel` permission for Haiku + Titan to relevant Lambda roles
+   - → `Agent1_Compare` → `ResolveLandmark` → `ParallelAgents` (Agent2_FunnyText ‖ CheckImageCache → Agent3_ImageGen)
+   - → `NormalizeParallelResults` → `SaveForecast`
+   - Bedrock calls: retry 2× on ThrottlingException only
+   - Individual Lambda timeout: 30–90 seconds depending on function
+   - Full pipeline timeout: 300 seconds
+6. IAM: grant Bedrock `InvokeModel` permission for Haiku to Agent1, Agent2, ResolveLandmark Lambdas
 
 ### Verification
 
@@ -185,52 +188,55 @@ Rationale: Biome covers ~95% of ESLint+Prettier needs in a single binary. The ma
 
 ---
 
-## Phase 4 — Telegram Bot + Web UI
+## Phase 4 — Real-time API + Web UI
 
 **Timeline**: Days 11–15
-**Goal**: Both user-facing surfaces working — get a forecast from Telegram or the browser
+**Goal**: Web SPA working end-to-end with real-time pipeline progress
 
-### Tasks — Telegram Bot
+> **Note**: Telegram bot is deferred post-MVP. Only the web surface is delivered in Phase 4.
 
-1. Register bot with BotFather, obtain `TELEGRAM_BOT_TOKEN`, add as SST Secret
-2. `packages/functions/src/telegram/webhook.ts`:
-   - grammY in webhook mode
-   - Handle `/start` command — welcome message, language detection
-   - Handle `/weather {city}` or plain text city name
-   - "Send loading message → invoke pipeline → edit message with result" pattern
-   - Display: funny text + weather summary + image (as photo with caption)
-   - Handle `/history` — show last 5 forecasts
-   - Handle `/lang {code}` — change language preference
-3. `infra/api.ts` — add `POST /telegram/webhook` route
-4. Set Telegram webhook URL to the deployed API endpoint
-5. User profile management: create/update Users table entry on each interaction
+### Tasks — Real-time API + WebSocket
+
+1. `infra/realtime.ts` — WebSocket API (`PipelineWsApi`):
+   - `$connect` route → `ws-connect.ts`: stores `executionArn → connectionId` in `WebSocketConnections` table (10-min TTL)
+   - `$disconnect` route → `ws-disconnect.ts`: removes connection entry
+2. `packages/core/src/types/` — add `PipelineStageId`, `StageProgressMessage`, `VISUAL_STAGES`
+3. `packages/functions/src/shared/report-stage.ts` — helper to emit `StageProgress` EventBridge events
+4. `infra/realtime.ts` — EventBridge rules:
+   - Rule 1: `uweather.pipeline` / `StageProgress` → `wsPushStage` Lambda
+   - Rule 2: Step Functions SUCCEEDED/FAILED/TIMED_OUT/ABORTED → `wsPushStage` Lambda
+5. `wsPushStage` Lambda: look up connections by executionArn, call `ManageConnections` API
 
 ### Tasks — Web UI
 
 1. `packages/web/` — Vite + React SPA:
-   - Main view: city input (with autocomplete or free text), language selector dropdown
+   - Main view: city input (with autocomplete), language selector dropdown
    - Forecast display: weather card (temp, condition, humidity, wind), funny text block, generated image
+   - Pipeline progress: real-time indicator showing 7 visual stage groups via WebSocket (`usePipelineProgress` hook)
    - History view: scrollable list of past forecasts (by anonymous session ID)
-   - Loading state: skeleton/spinner while pipeline runs (can take 15–30s)
-   - Error state: user-friendly message on failure
+   - Loading state: live pipeline progress while pipeline runs (15–30s)
+   - Error state: user-friendly error card with failure details
    - Responsive design (mobile-friendly)
-2. API client: fetch wrapper for `GET /forecast?city=X&lang=Y` and `GET /history?userId=X`
+2. API client (`packages/web/src/api.ts`): fetch wrappers for `/forecast`, `/forecast/status`, `/history`
 3. `packages/functions/src/api/forecast.ts`:
-   - Parse query params, validate city is non-empty
-   - Invoke orchestrator, wait for result (or poll Step Functions execution)
-   - Return `ForecastResponse` JSON
-4. `packages/functions/src/api/history.ts`:
+   - Parse + validate city query param
+   - Invoke orchestrator, return 202 `{ status: "pending", executionArn }`
+4. `packages/functions/src/api/forecast-status.ts`:
+   - Accept `executionArn` param, call SFN `DescribeExecution`
+   - If SUCCEEDED: fetch ForecastResult from DynamoDB, return 200 with full forecast
+   - If RUNNING: return 202 `{ status: "pending" }`
+5. `packages/functions/src/api/history.ts`:
    - Query `UserHistoryIndex` GSI by userId, return last N forecasts
-5. `infra/web.ts` — SST `StaticSite` pointing to `packages/web/`, CloudFront distribution
+6. `infra/web.ts` — SST `StaticSite` pointing to `packages/web/`, CloudFront distribution
+   - Inject `VITE_API_URL` and `VITE_WS_URL` at build time
 
 ### Verification
 
-- Telegram: send "Kyiv" to bot → receive loading message → edited to forecast with image
-- Telegram: `/weather London` → English forecast for London
-- Telegram: `/lang uk` then "Київ" → Ukrainian forecast
-- Web: open URL, enter "Kyiv", select "en" → forecast card with image renders
+- Web: open URL, enter "Kyiv", select "en" → pipeline progress indicator shows each stage → forecast card with image renders
+- Web: WebSocket connection established on load; disconnects cleanly after pipeline completes
+- `/forecast` returns 202 immediately with executionArn
+- `/forecast/status?executionArn=...` returns 202 while running, 200 with full forecast on completion
 - Web: refresh page → history shows previous forecast
-- Both surfaces return identical weather data for the same city/time
 
 ---
 
@@ -241,30 +247,30 @@ Rationale: Biome covers ~95% of ESLint+Prettier needs in a single binary. The ma
 
 ### Tasks
 
-1. `packages/core/src/utils/logger.ts` — enhance structured logger:
-   - Auto-include `service`, `function`, `requestId`, `correlationId`, `userId`, `city`
+1. `packages/core/src/utils/logger.ts` — structured logger with `createLogger()`:
+   - Auto-include `service`, `function`, `requestId`, `correlationId`, `city`
    - Log levels: DEBUG, INFO, WARN, ERROR
-   - Duration tracking helper (wrap async calls)
-2. Add structured logging to all existing Lambda functions
-3. `infra/monitoring.ts` — CloudWatch resources:
+2. `packages/core/src/utils/metrics.ts` — `emitMetric()` using EMF (Embedded Metrics Format)
+3. Add structured logging + metric emission to all Lambda functions
+4. `infra/monitoring.ts` — CloudWatch resources:
    - Dashboard `uweather-{stage}` with 7 panels (per observability plan in tech spec)
-   - Custom metrics: `WeatherCacheHitRate`, `ImageCacheHitRate`, `ProviderLatency`, `ProviderErrorRate`, `BedrockLatency`, `ForecastE2ELatency`, `ImageGenerationCount`
-   - Alarms: provider error rate >5%, Step Functions failure >1%, Lambda >75s, Bedrock throttling >3/5min
+   - EMF custom metrics: `WeatherCacheHit/Miss`, `ImageCacheHit/Miss/ImageGenerationCount`, `ProviderSuccess/Error`, `BedrockLatency`, `BedrockThrottled`, `LowConfidenceForecast`
+   - Alarms: SFN any failure, provider errors >5/5min, orchestrator P99 >25s, Bedrock throttling >3/5min
    - SNS topic for alarm notifications → email
-4. Enable X-Ray tracing on API Gateway + all Lambda functions
-5. Error handling hardening:
-   - Graceful degradation: if only 1 provider returns, use it with low confidence
-   - Bedrock timeout handling: return cached text if available, log warning
-   - Telegram: never leave user without a response (always send error message)
-   - Web: meaningful error messages, retry button
+5. Enable X-Ray Active tracing on all Lambda functions and Step Functions (via SST stack transform)
+6. Error handling hardening:
+   - Graceful degradation: if only 1 provider returns, use it with `low` confidence, emit `LowConfidenceForecast` metric
+   - Web: meaningful error card shown on pipeline failure
+7. `infra/app-registry.ts` — AWS AppRegistry Application + Resource Group (tag-based: `Application=uweather`, `Stage={stage}`)
 
 ### Verification
 
 - Run 10+ test requests across both surfaces
 - CloudWatch dashboard shows all 7 panels with data
 - Simulate provider failure (invalid API key) → alarm fires, email received
-- X-Ray trace shows full request path: API Gateway → Lambda → Step Functions → Bedrock
+- X-Ray trace shows full request path: API Gateway → Orchestrator → Step Functions → Lambdas → Bedrock
 - Check no unhandled errors in CloudWatch Logs
+- AppRegistry Application visible in AWS console with correct resource group
 
 ---
 
@@ -301,21 +307,22 @@ Rationale: Biome covers ~95% of ESLint+Prettier needs in a single binary. The ma
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Bedrock model access not approved in time | Blocks Phase 3 entirely | Request access on Day 1; have fallback to OpenAI API if delayed |
-| Titan image quality insufficient | Poor UX, images don't match city/weather | Budget for prompt iteration; have upgrade path to SDXL ($0.04/image) |
-| Step Functions cold start + Bedrock latency | User waits 20–30s for forecast | Loading UX pattern (Telegram edit, Web skeleton); consider provisioned concurrency later |
+| Bedrock model access not approved in time | Blocks Phase 3 entirely | Request access on Day 1 |
+| Pixazo API reliability or pricing change | Image generation fails / cost spikes | Monitor usage; Stable Diffusion XL on Bedrock available as drop-in fallback |
+| Step Functions cold start + Bedrock latency | User waits 20–30s for forecast | Real-time WebSocket progress updates; consider provisioned concurrency later |
 | OpenWeatherMap/WeatherAPI rate limits | Provider failures at scale | Cache aggressively (30 min TTL); graceful degradation to 2 or 1 provider |
+| Wikidata SPARQL availability | Landmark resolution fails | Bedrock Haiku fallback always active |
 | SST v3 breaking changes | Build/deploy failures | Pin SST version in package.json; update deliberately |
 
 ---
 
 ## Future Phases (Post-MVP)
 
-These are explicitly out of scope for the initial 20-day plan but documented for planning:
+These are explicitly out of scope for the initial plan but documented for planning:
 
+- **Telegram bot** — grammY webhook, "send loading message → edit with result" UX, `/weather`, `/history`, `/lang` commands
 - **Scheduled daily notifications** — EventBridge + SQS fan-out to subscribed users
 - **Android app** — React Native or Kotlin, consumes same API
-- **Location knowledge base** — curated city facts to improve Agent 2 output
 - **Multi-day forecasts** — extend pipeline to handle 3–5 day forecasts
 - **Rate limiting** — API Gateway throttling + per-user limits
 - **CI/CD** — GitHub Actions: lint + typecheck + deploy on push to main

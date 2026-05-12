@@ -1,4 +1,4 @@
-import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { getHistory, pollForecastResult, startForecast } from './api.js';
 import type { ForecastResponse } from './api.js';
 import { ErrorCard } from './components/ErrorCard.js';
@@ -7,6 +7,7 @@ import { HistoryList } from './components/HistoryList.js';
 import { PipelineProgress } from './components/PipelineProgress.js';
 import { SearchForm } from './components/SearchForm.js';
 import type { CityCoords } from './components/SearchForm.js';
+import { useForecastCompletion } from './hooks/useForecastCompletion.js';
 import { usePipelineProgress } from './hooks/usePipelineProgress.js';
 import { getSessionId } from './lib/session.js';
 
@@ -37,39 +38,25 @@ export function App() {
       });
   }, [sessionId]);
 
-  // When pipeline completes via WebSocket, fetch the result
-  const fetchingResultRef = useRef(false);
-  useEffect(() => {
-    if (!progress.completed || state.status !== 'loading') return;
-    if (fetchingResultRef.current) return; // prevent double-fire
-    fetchingResultRef.current = true;
+  const MAX_HISTORY_DISPLAY = 10;
 
-    if (progress.succeeded) {
-      pollForecastResult(state.executionArn)
-        .then((forecast) => {
-          setState({ status: 'success', forecast });
-          setHistory((prev) => {
-            const filtered = prev.filter((f) => f.forecastId !== forecast.forecastId);
-            return [forecast, ...filtered].slice(0, 10);
-          });
-        })
-        .catch((err) => {
-          setState({
-            status: 'error',
-            message: err instanceof Error ? err.message : 'Something went wrong.',
-          });
-        })
-        .finally(() => {
-          fetchingResultRef.current = false;
-        });
-    } else {
-      fetchingResultRef.current = false;
-      setState({
-        status: 'error',
-        message: 'Forecast pipeline failed — please try again.',
-      });
-    }
-  }, [progress.completed, progress.succeeded, state]);
+  const addToHistory = useCallback((forecast: ForecastResponse) => {
+    setHistory((prev) => {
+      const filtered = prev.filter((item) => item.forecastId !== forecast.forecastId);
+      return [forecast, ...filtered].slice(0, MAX_HISTORY_DISPLAY);
+    });
+  }, []);
+
+  // When pipeline completes via WebSocket, fetch the result
+  useForecastCompletion({
+    progress,
+    state,
+    onSuccess: (forecast) => {
+      setState({ status: 'success', forecast });
+      addToHistory(forecast);
+    },
+    onError: (message) => setState({ status: 'error', message }),
+  });
 
   const handleCityChange = useCallback((value: string, newCoords?: CityCoords) => {
     setCity(value);
@@ -91,10 +78,7 @@ export function App() {
         if (!import.meta.env.VITE_WS_URL) {
           const forecast = await pollForecastResult(arn);
           setState({ status: 'success', forecast });
-          setHistory((prev) => {
-            const filtered = prev.filter((f) => f.forecastId !== forecast.forecastId);
-            return [forecast, ...filtered].slice(0, 10);
-          });
+          addToHistory(forecast);
         }
         // With WebSocket, the completion useEffect handles the result fetch
       } catch (err) {
@@ -104,7 +88,7 @@ export function App() {
         });
       }
     },
-    [city, coords, lang, sessionId, state.status],
+    [city, coords, lang, sessionId, state.status, addToHistory],
   );
 
   const handleHistorySelect = (forecast: ForecastResponse) => {

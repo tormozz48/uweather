@@ -1,5 +1,5 @@
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
-import { buildResolveLandmarkPrompt, createLogger, emitMetric } from '@uweather/core';
+import { buildResolveLandmarkPrompt, createLogger, emitMetric, stripMarkdownFence } from '@uweather/core';
 import type { Context } from 'aws-lambda';
 import { reportStage } from '../lib/report-stage.js';
 
@@ -16,6 +16,12 @@ const WIKIDATA_SPARQL_URL = 'https://query.wikidata.org/sparql';
 
 /** Minimum landmarks from Wikidata before we fall back to Bedrock. */
 const MIN_LANDMARKS = 3;
+
+/** Timeout for Wikidata SPARQL HTTP requests. */
+const WIKIDATA_QUERY_TIMEOUT_MS = 8000;
+
+/** Max tokens for Bedrock landmark generation (shorter than text agents — just a JSON array). */
+const BEDROCK_LANDMARK_MAX_TOKENS = 512;
 
 export interface ResolveLandmarkInput {
   city: string;
@@ -75,7 +81,7 @@ async function fetchFromWikidata(city: string): Promise<string[]> {
       Accept: 'application/sparql-results+json',
       'User-Agent': 'uweather-bot/1.0 (https://github.com/uweather)',
     },
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(WIKIDATA_QUERY_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -107,7 +113,7 @@ async function fetchFromBedrock(city: string): Promise<string[]> {
       accept: 'application/json',
       body: JSON.stringify({
         anthropic_version: 'bedrock-2023-05-31',
-        max_tokens: 512,
+        max_tokens: BEDROCK_LANDMARK_MAX_TOKENS,
         system,
         messages: [{ role: 'user', content: user }],
       }),
@@ -121,7 +127,7 @@ async function fetchFromBedrock(city: string): Promise<string[]> {
   const text = responseBody.content.find((c) => c.type === 'text')?.text?.trim() ?? '[]';
 
   // Parse the JSON array — Haiku sometimes wraps in markdown code fences
-  const cleaned = text.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+  const cleaned = stripMarkdownFence(text);
   const parsed = JSON.parse(cleaned) as unknown;
 
   if (!Array.isArray(parsed) || parsed.length === 0) {

@@ -4,6 +4,12 @@ import type { TimeSlot } from './time.js';
 
 export type TempBucket = 'freezing' | 'cold' | 'cool' | 'mild' | 'warm' | 'hot';
 
+const TEMP_FREEZING_MAX_C = 0;
+const TEMP_COLD_MAX_C = 10;
+const TEMP_COOL_MAX_C = 18;
+const TEMP_MILD_MAX_C = 24;
+const TEMP_WARM_MAX_C = 30;
+
 /**
  * Map a consensus temperature (Celsius) to a named bucket.
  *
@@ -15,11 +21,11 @@ export type TempBucket = 'freezing' | 'cold' | 'cool' | 'mild' | 'warm' | 'hot';
  * hot:      > 30°C
  */
 export function getTempBucket(celsius: number): TempBucket {
-  if (celsius < 0) return 'freezing';
-  if (celsius < 10) return 'cold';
-  if (celsius < 18) return 'cool';
-  if (celsius < 24) return 'mild';
-  if (celsius < 30) return 'warm';
+  if (celsius < TEMP_FREEZING_MAX_C) return 'freezing';
+  if (celsius < TEMP_COLD_MAX_C) return 'cold';
+  if (celsius < TEMP_COOL_MAX_C) return 'cool';
+  if (celsius < TEMP_MILD_MAX_C) return 'mild';
+  if (celsius < TEMP_WARM_MAX_C) return 'warm';
   return 'hot';
 }
 

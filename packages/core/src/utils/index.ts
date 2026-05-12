@@ -8,3 +8,7 @@ export type { TimeSlot } from './time.js';
 
 export { buildImageCacheKey, buildS3ImageKey, getTempBucket } from './cache-key.js';
 export type { TempBucket, ImageCacheKeyParams } from './cache-key.js';
+
+export { degreesToCardinal } from './wind.js';
+
+export { stripMarkdownFence } from './text.js';

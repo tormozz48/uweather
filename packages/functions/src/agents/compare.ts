@@ -1,4 +1,4 @@
-import { buildComparePrompt, createLogger, emitMetric } from '@uweather/core';
+import { buildComparePrompt, createLogger, emitMetric, stripMarkdownFence } from '@uweather/core';
 import type { ConsensusForecast, UnifiedWeatherData } from '@uweather/core';
 import type { Context } from 'aws-lambda';
 import { callBedrock } from '../lib/bedrock.js';
@@ -23,6 +23,47 @@ export interface CompareOutput {
   sourcesUsed: ('openweather' | 'weatherapi' | 'open-meteo')[];
 }
 
+/** Max characters of Bedrock raw response included in error logs. */
+const BEDROCK_ERROR_EXCERPT_LENGTH = 400;
+
+/**
+ * Normalise raw provider results — accept both wrapped `{ success, data }` objects
+ * and bare `UnifiedWeatherData` values. Returns only successful entries.
+ */
+function normalizeProviderResults(providerResults: ProviderResult[]): UnifiedWeatherData[] {
+  return providerResults
+    .filter(
+      (
+        result,
+      ): result is
+        | UnifiedWeatherData
+        | { success: true; provider: string; data: UnifiedWeatherData } => {
+        if ('success' in result) return result.success === true && result.data != null;
+        return true;
+      },
+    )
+    .map((result) =>
+      'success' in result && 'data' in result
+        ? (result as { success: true; provider: string; data: UnifiedWeatherData }).data
+        : (result as UnifiedWeatherData),
+    );
+}
+
+/**
+ * Parse the Bedrock JSON response into a ConsensusForecast.
+ * Throws a descriptive error when the text is not valid JSON.
+ */
+function parseConsensusForecast(rawText: string): ConsensusForecast {
+  const jsonText = stripMarkdownFence(rawText);
+  try {
+    return JSON.parse(jsonText) as ConsensusForecast;
+  } catch {
+    throw new Error(
+      `Agent1_Compare: Bedrock response was not valid JSON — excerpt: ${rawText.slice(0, BEDROCK_ERROR_EXCERPT_LENGTH)}`,
+    );
+  }
+}
+
 /**
  * Agent 1 — Weather Comparison Lambda.
  *
@@ -39,23 +80,7 @@ export async function handler(input: CompareInput, context: Context): Promise<Co
   if (input.executionArn) await reportStage(input.executionArn, 'compare', 'started');
   reqLog.info('Agent1_Compare starting', { date: input.date });
 
-  // Normalise — accept both wrapped { success, data } objects and bare UnifiedWeatherData
-  const weatherDataArray: UnifiedWeatherData[] = input.providerResults
-    .filter(
-      (
-        r,
-      ): r is
-        | UnifiedWeatherData
-        | { success: true; provider: string; data: UnifiedWeatherData } => {
-        if ('success' in r) return r.success === true && r.data != null;
-        return true;
-      },
-    )
-    .map((r) =>
-      'success' in r && 'data' in r
-        ? (r as { success: true; provider: string; data: UnifiedWeatherData }).data
-        : (r as UnifiedWeatherData),
-    );
+  const weatherDataArray = normalizeProviderResults(input.providerResults);
 
   if (weatherDataArray.length === 0) {
     reqLog.error('No successful provider data — cannot produce consensus');
@@ -63,7 +88,7 @@ export async function handler(input: CompareInput, context: Context): Promise<Co
     throw new Error(`Agent1_Compare: no successful provider data for ${input.city}`);
   }
 
-  const sourcesUsed = weatherDataArray.map((w) => w.provider) as (
+  const sourcesUsed = weatherDataArray.map((weatherData) => weatherData.provider) as (
     | 'openweather'
     | 'weatherapi'
     | 'open-meteo'
@@ -81,22 +106,9 @@ export async function handler(input: CompareInput, context: Context): Promise<Co
   reqLog.info('Comparing weather data', { providers: sourcesUsed });
 
   const { system, user } = buildComparePrompt({ providers: weatherDataArray });
-
   const rawText = await callBedrock({ system, user, agent: 'compare', log: reqLog });
 
-  // Strip accidental markdown fences before parsing
-  const jsonText = rawText
-    .replace(/^```(?:json)?\s*/m, '')
-    .replace(/\s*```\s*$/m, '')
-    .trim();
-
-  let consensus: ConsensusForecast;
-  try {
-    consensus = JSON.parse(jsonText) as ConsensusForecast;
-  } catch {
-    reqLog.error('Failed to parse ConsensusForecast JSON', { excerpt: rawText.slice(0, 400) });
-    throw new Error('Agent1_Compare: Bedrock response was not valid JSON');
-  }
+  const consensus = parseConsensusForecast(rawText);
 
   reqLog.info('Consensus forecast generated', {
     condition: consensus.condition,

@@ -6,6 +6,9 @@
  */
 import type { ConsensusForecast } from '../types/weather.js';
 
+/** Max characters taken from each history entry to avoid oversized prompts. */
+const HISTORY_EXCERPT_LENGTH = 300;
+
 export interface FunnyTextPromptParams {
   consensus: ConsensusForecast;
   city: string;
@@ -23,7 +26,7 @@ export function buildFunnyTextPrompt(params: FunnyTextPromptParams): {
   const historySection =
     params.recentHistory && params.recentHistory.length > 0
       ? `\nRecent forecasts for this city (DO NOT repeat the same landmarks, jokes, or themes):\n${params.recentHistory
-          .map((h, i) => `${i + 1}. ${h.slice(0, 300)}`)
+          .map((h, i) => `${i + 1}. ${h.slice(0, HISTORY_EXCERPT_LENGTH)}`)
           .join('\n')}`
       : '';
 
@@ -39,22 +42,22 @@ Style guidelines:
 - Respond entirely in the requested language — use natural idioms, not a direct translation
 - Never use markdown formatting${historySection}`;
 
-  const c = params.consensus;
+  const consensus = params.consensus;
   const disagreementNote =
-    c.disagreements.length > 0
-      ? `\n- Note: Weather models partially disagree on: ${c.disagreements.join(', ')}`
+    consensus.disagreements.length > 0
+      ? `\n- Note: Weather models partially disagree on: ${consensus.disagreements.join(', ')}`
       : '';
 
   const user = `Write a funny weather forecast for ${params.city} in language "${params.language}".
 
-Current conditions (${c.confidence} confidence, ${c.providerCount} source${c.providerCount !== 1 ? 's' : ''}):
-- Temperature: ${c.temperature}°C (feels like ${c.feelsLike}°C)
-- Condition: ${c.condition} — ${c.conditionDescription}
-- Humidity: ${c.humidity}%
-- Wind: ${c.windSpeed} km/h ${c.windDirection}
-- Precipitation: ${c.precipitation} mm
-- UV index: ${c.uvIndex}
-- Sunrise: ${c.sunrise} / Sunset: ${c.sunset}${disagreementNote}
+Current conditions (${consensus.confidence} confidence, ${consensus.providerCount} source${consensus.providerCount !== 1 ? 's' : ''}):
+- Temperature: ${consensus.temperature}°C (feels like ${consensus.feelsLike}°C)
+- Condition: ${consensus.condition} — ${consensus.conditionDescription}
+- Humidity: ${consensus.humidity}%
+- Wind: ${consensus.windSpeed} km/h ${consensus.windDirection}
+- Precipitation: ${consensus.precipitation} mm
+- UV index: ${consensus.uvIndex}
+- Sunrise: ${consensus.sunrise} / Sunset: ${consensus.sunset}${disagreementNote}
 
 Write 2–3 paragraphs in ${params.language}. Return only the forecast text, no JSON, no markdown.`;
 

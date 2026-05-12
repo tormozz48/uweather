@@ -57,17 +57,17 @@ export function CityAutocomplete({ city, isLoading, onCityChange }: CityAutocomp
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setActiveIndex((i) => Math.min(i + 1, suggestions.length - 1));
+        setActiveIndex((prev) => Math.min(prev + 1, suggestions.length - 1));
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setActiveIndex((i) => Math.max(i - 1, -1));
+        setActiveIndex((prev) => Math.max(prev - 1, -1));
         break;
       case 'Enter':
         if (activeIndex >= 0) {
           e.preventDefault();
-          const s = suggestions[activeIndex];
-          selectSuggestion(s.name, { lat: s.lat, lon: s.lon });
+          const suggestion = suggestions[activeIndex];
+          selectSuggestion(suggestion.name, { lat: suggestion.lat, lon: suggestion.lon });
         }
         break;
       case 'Escape':
@@ -112,24 +112,24 @@ export function CityAutocomplete({ city, isLoading, onCityChange }: CityAutocomp
           aria-label="City suggestions"
           tabIndex={-1}
         >
-          {suggestions.map((s, i) => (
+          {suggestions.map((suggestion, index) => (
             <div
-              key={s.id}
-              id={`${listboxId}-option-${i}`}
-              className={`city-autocomplete__item${i === activeIndex ? ' city-autocomplete__item--active' : ''}`}
+              key={suggestion.id}
+              id={`${listboxId}-option-${index}`}
+              className={`city-autocomplete__item${index === activeIndex ? ' city-autocomplete__item--active' : ''}`}
               role="option"
-              aria-selected={i === activeIndex}
+              aria-selected={index === activeIndex}
               tabIndex={-1}
               onPointerDown={(e) => {
                 // Prevent blur on input before click fires
                 e.preventDefault();
-                selectSuggestion(s.name, { lat: s.lat, lon: s.lon });
+                selectSuggestion(suggestion.name, { lat: suggestion.lat, lon: suggestion.lon });
               }}
             >
-              <span className="city-autocomplete__item-name">{s.name}</span>
-              {(s.admin1 ?? s.country) && (
+              <span className="city-autocomplete__item-name">{suggestion.name}</span>
+              {(suggestion.admin1 ?? suggestion.country) && (
                 <span className="city-autocomplete__item-sub">
-                  {[s.admin1, s.country].filter(Boolean).join(', ')}
+                  {[suggestion.admin1, suggestion.country].filter(Boolean).join(', ')}
                 </span>
               )}
             </div>

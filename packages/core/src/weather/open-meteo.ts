@@ -13,6 +13,7 @@
  */
 import type { UnifiedWeatherData, WeatherCondition } from '../types/weather.js';
 import { toDateString } from '../utils/time.js';
+import { degreesToCardinal } from '../utils/wind.js';
 
 // ── Internal API response types ──────────────────────────────────────────────
 
@@ -98,13 +99,6 @@ const WMO_DESCRIPTIONS: Record<number, string> = {
   96: 'Thunderstorm with slight hail',
   99: 'Thunderstorm with heavy hail',
 };
-
-// ── Shared utility ────────────────────────────────────────────────────────────
-
-function degreesToCardinal(deg: number): string {
-  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-  return dirs[Math.round(deg / 45) % 8] ?? 'N';
-}
 
 /**
  * Open-Meteo returns ISO datetime strings without timezone suffix when timezone=UTC.
