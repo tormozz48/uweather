@@ -1,26 +1,24 @@
 import { randomUUID } from 'node:crypto';
 /**
- * Orchestrator Lambda — entry point for the forecast pipeline.
+ * Orchestrator Lambda — single entry point for starting the forecast pipeline.
  *
- * 1. Normalizes city name.
- * 2. Queries WeatherCache: if ≥2 providers have fresh data (< 30 min), returns
- *    a cache hit immediately without starting Step Functions.
- * 3. On cache miss: starts a Step Functions Standard Workflow execution and
- *    returns the execution ARN for status polling (used in Phase 4 by the API).
+ * Normalises the city name, then unconditionally starts a Step Functions
+ * Standard Workflow execution and returns the execution ARN.
  *
- * Invoked directly in Phase 2 (for testing). In Phase 4, the GET /forecast
- * Lambda handler will call this function.
+ * The state machine owns all cache checks internally (CheckCache → CacheDecision):
+ * if ≥2 providers have fresh weather data it skips provider fetches and goes
+ * straight to the AI agents; otherwise it fetches fresh data first. Duplicating
+ * that cache check here would create a confusing dual-start path without saving
+ * any SFN executions (AI agents always need to run regardless of weather cache).
+ *
+ * Callers poll GET /forecast/status?executionArn={arn} for pipeline progress.
  */
 import { SFNClient, StartExecutionCommand } from '@aws-sdk/client-sfn';
 import { createLogger, getCurrentTimeSlot, normalizeCity, toDateString } from '@uweather/core';
-import type { UnifiedWeatherData } from '@uweather/core';
 import type { Context } from 'aws-lambda';
-import { weatherCacheService } from './services/index.js';
 
 const sfn = new SFNClient({});
 const log = createLogger({ function: 'orchestrator' });
-
-const CACHE_FRESH_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
 
 export interface OrchestratorInput {
   city: string;
@@ -35,9 +33,9 @@ export interface OrchestratorInput {
   lon?: number;
 }
 
-export type OrchestratorOutput =
-  | { cacheHit: true; providers: UnifiedWeatherData[] }
-  | { cacheHit: false; executionArn: string };
+export interface OrchestratorOutput {
+  executionArn: string;
+}
 
 export async function handler(
   input: OrchestratorInput,
@@ -62,26 +60,6 @@ export async function handler(
 
   reqLog.info('Orchestrator invoked', { userId });
 
-  // ── 1. Check WeatherCache ───────────────────────────────────────────────────
-  const items = await weatherCacheService.load(cityNormalized, date);
-  const cutoffMs = Date.now() - CACHE_FRESH_WINDOW_MS;
-  const freshItems = items.filter((item) => new Date(item.fetchedAt).getTime() > cutoffMs);
-
-  if (freshItems.length >= 2) {
-    reqLog.info('Cache hit — skipping Step Functions', {
-      freshProviders: freshItems.length,
-    });
-    return {
-      cacheHit: true,
-      providers: freshItems.map((item) => item.data),
-    };
-  }
-
-  // ── 2. Cache miss — start Step Functions execution ─────────────────────────
-  reqLog.info('Cache miss — starting Step Functions execution', {
-    staleItems: freshItems.length,
-  });
-
   const stateMachineArn = process.env.STATE_MACHINE_ARN;
   if (!stateMachineArn) throw new Error('STATE_MACHINE_ARN environment variable is not set');
 
@@ -101,8 +79,5 @@ export async function handler(
     executionName,
   });
 
-  return {
-    cacheHit: false,
-    executionArn: execution.executionArn ?? '',
-  };
+  return { executionArn: execution.executionArn ?? '' };
 }

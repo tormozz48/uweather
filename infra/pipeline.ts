@@ -683,7 +683,6 @@ export const forecastPipeline = new aws.sfn.StateMachine('ForecastPipeline', {
 
 export const orchestratorFunction = new sst.aws.Function('OrchestratorFn', {
   handler: 'packages/functions/src/orchestrator.handler',
-  link: [weatherCacheTable],
   environment: {
     STATE_MACHINE_ARN: forecastPipeline.arn,
   },
