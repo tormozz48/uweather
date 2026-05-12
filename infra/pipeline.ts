@@ -675,7 +675,7 @@ export const forecastPipeline = new aws.sfn.StateMachine('ForecastPipeline', {
   loggingConfiguration: {
     level: 'ERROR',
     includeExecutionData: false,
-    logDestinations: [{ cloudwatchLogsLogGroup: { logGroupArn: sfnLogGroup.arn } }],
+    logDestination: $interpolate`${sfnLogGroup.arn}:*`,
   },
 });
 
