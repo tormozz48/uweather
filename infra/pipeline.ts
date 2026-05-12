@@ -675,7 +675,9 @@ export const forecastPipeline = new aws.sfn.StateMachine('ForecastPipeline', {
   loggingConfiguration: {
     level: 'ERROR',
     includeExecutionData: false,
-    logDestinations: [{ cloudwatchLogsLogGroup: { logGroupArn: sfnLogGroup.arn } }],
+    // Pulumi AWS provider uses a single string logDestination (not an array).
+    // The ARN must be suffixed with :* per the AWS API requirement.
+    logDestination: $interpolate`${sfnLogGroup.arn}:*`,
   },
 });
 
