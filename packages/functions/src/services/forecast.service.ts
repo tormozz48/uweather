@@ -106,27 +106,37 @@ export class ForecastService {
    *
    * @param city     - Normalized city name
    * @param language - ISO 639-1 language code
-   * @param limit    - Max history items, defaults to 5
+   * @param limit    - Max results to return (after filtering), defaults to 5
+   *
+   * DynamoDB note: FilterExpression is applied AFTER Limit, so Limit must be
+   * set larger than the desired result count to ensure enough items survive the
+   * language filter. We scan limit * 10 items (50 by default) — generous enough
+   * that all scanned items are for the same city PK, only language varies.
+   * The `city` attribute filter is omitted as it is already encoded in the PK
+   * (`system#{city}`), making the additional check redundant.
    */
   async listRecentFunnyTexts(city: string, language: string, limit = 5): Promise<string[]> {
+    const scanLimit = limit * 10; // scan more than needed so the language filter has room
     const result = await dynamo.send(
       new QueryCommand({
         TableName: Resource.Forecasts.name,
         IndexName: 'UserHistoryIndex',
         KeyConditionExpression: 'userId = :uid',
-        FilterExpression: 'city = :city AND #lang = :lang',
+        FilterExpression: '#lang = :lang',
         ExpressionAttributeNames: { '#lang': 'language' },
         ExpressionAttributeValues: {
           ':uid': `system#${city}`,
-          ':city': city,
           ':lang': language,
         },
         ScanIndexForward: false, // newest first
-        Limit: limit,
+        Limit: scanLimit,
         ProjectionExpression: 'funnyText',
       }),
     );
-    return (result.Items ?? []).map((item) => item.funnyText as string).filter(Boolean);
+    return (result.Items ?? [])
+      .map((item) => item.funnyText as string)
+      .filter(Boolean)
+      .slice(0, limit);
   }
 }
 
