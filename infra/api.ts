@@ -37,15 +37,44 @@ const xrayPermissions = [
   },
 ];
 
+// ── CORS allowed origins ──────────────────────────────────────────────────────
+//
+// dev: allow all origins (needed for `sst dev` and local Vite server).
+// prod: restrict to the web SPA CloudFront domain to prevent unauthorized API
+//       consumers from running up Bedrock/Pixazo costs.
+//
+// Because api.ts is imported before web.ts (web needs api.url for its build),
+// the CloudFront URL cannot be derived automatically at deploy time.
+//
+// Workflow for prod:
+//   1. Run `pnpm sst deploy --stage prod` once — note the Web URL in outputs.
+//   2. On subsequent deploys, export the URL:
+//        WEB_ORIGIN=https://dXXXX.cloudfront.net pnpm deploy-prod
+//      or set it in your CI/CD environment.
+//
+// If WEB_ORIGIN is unset in prod, CORS falls back to '*' with a warning.
+
+const allowedOrigins = (() => {
+  if ($app.stage !== 'prod') return ['*'];
+  const origin = process.env.WEB_ORIGIN?.trim();
+  if (!origin) {
+    console.warn(
+      '[api] WEB_ORIGIN is not set for the prod stage — CORS allowOrigins is open (*).' +
+        ' Set WEB_ORIGIN to the web SPA CloudFront URL to restrict access.',
+    );
+    return ['*'];
+  }
+  return [origin];
+})();
+
 /**
  * API Gateway HTTP API.
- * All routes share CORS defaults (allowOrigins: ["*"]) for MVP.
  */
 export const api = new sst.aws.ApiGatewayV2('Api', {
   cors: {
     allowMethods: ['GET', 'POST'],
     allowHeaders: ['Content-Type'],
-    allowOrigins: ['*'],
+    allowOrigins: allowedOrigins,
   },
 });
 
