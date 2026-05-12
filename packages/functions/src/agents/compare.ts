@@ -1,14 +1,10 @@
-import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { buildComparePrompt, createLogger, emitMetric } from '@uweather/core';
 import type { ConsensusForecast, UnifiedWeatherData } from '@uweather/core';
 import type { Context } from 'aws-lambda';
+import { callBedrock } from '../lib/bedrock.js';
 import { reportStage } from '../lib/report-stage.js';
 
-const bedrock = new BedrockRuntimeClient({});
 const log = createLogger({ function: 'agent-compare' });
-
-/** Claude 4.5 Haiku inference profile ID on Bedrock (required for on-demand throughput) */
-const MODEL_ID = 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
 
 type ProviderResult =
   | UnifiedWeatherData
@@ -86,53 +82,7 @@ export async function handler(input: CompareInput, context: Context): Promise<Co
 
   const { system, user } = buildComparePrompt({ providers: weatherDataArray });
 
-  // Track Bedrock latency manually so we can emit the metric regardless of success/failure
-  const bedrockStart = Date.now();
-  let bedrockDurationMs = 0;
-
-  let rawText: string;
-  try {
-    const response = await bedrock.send(
-      new InvokeModelCommand({
-        modelId: MODEL_ID,
-        contentType: 'application/json',
-        accept: 'application/json',
-        body: JSON.stringify({
-          anthropic_version: 'bedrock-2023-05-31',
-          max_tokens: 1024,
-          system,
-          messages: [{ role: 'user', content: user }],
-        }),
-      }),
-    );
-
-    bedrockDurationMs = Date.now() - bedrockStart;
-    emitMetric('BedrockLatency', bedrockDurationMs, 'Milliseconds', { agent: 'compare' });
-    reqLog.info('Bedrock Haiku - compare', { duration_ms: bedrockDurationMs });
-
-    const responseBody = JSON.parse(new TextDecoder().decode(response.body)) as {
-      content: Array<{ type: string; text: string }>;
-    };
-    rawText = responseBody.content.find((c) => c.type === 'text')?.text ?? '';
-  } catch (err) {
-    bedrockDurationMs = Date.now() - bedrockStart;
-    const isThrottle =
-      err instanceof Error &&
-      (err.name === 'ThrottlingException' || err.message.includes('throttl'));
-    if (isThrottle) {
-      reqLog.warn('Bedrock throttled on compare agent', {
-        duration_ms: bedrockDurationMs,
-        error: (err as Error).message,
-      });
-      emitMetric('BedrockThrottled', 1, 'Count', { agent: 'compare' });
-    } else {
-      reqLog.error('Bedrock invocation failed on compare agent', {
-        duration_ms: bedrockDurationMs,
-        error: (err as Error).message,
-      });
-    }
-    throw err;
-  }
+  const rawText = await callBedrock({ system, user, agent: 'compare', log: reqLog });
 
   // Strip accidental markdown fences before parsing
   const jsonText = rawText
@@ -153,7 +103,6 @@ export async function handler(input: CompareInput, context: Context): Promise<Co
     temperature: consensus.temperature,
     confidence: consensus.confidence,
     providerCount: sourcesUsed.length,
-    bedrockDurationMs,
   });
 
   if (input.executionArn) await reportStage(input.executionArn, 'compare', 'done');
