@@ -21,6 +21,15 @@ export default $config({
     };
   },
   async run() {
+    // Apply a default 30-day log retention to every Lambda in the stack.
+    // Without this, Lambda auto-creates log groups with infinite retention,
+    // which accumulates cost indefinitely and makes log cleanup manual.
+    // Individual functions can override by passing their own `logging` config.
+    $transform(sst.aws.Function, (args) => {
+      args.logging ??= {};
+      (args.logging as { retention?: string }).retention ??= '1 month';
+    });
+
     const { applicationArn } = await import('./infra/app-registry.ts');
     await import('./infra/storage.ts'); // DynamoDB tables, S3, CloudFront (images)
     await import('./infra/pipeline.ts'); // Secrets, Lambdas, Step Functions
