@@ -12,7 +12,7 @@ import { forecastPipeline } from './pipeline.ts';
  * Import order requirement: pipeline.ts must be imported before this file
  * because api.ts depends on forecastPipeline.
  */
-import { forecastsTable, weatherCacheTable } from './storage.ts';
+import { forecastsTable } from './storage.ts';
 
 // ── Shared X-Ray config ───────────────────────────────────────────────────────
 //
@@ -82,14 +82,14 @@ api.route('GET /health', {
 
 // ── GET /forecast ─────────────────────────────────────────────────────────────
 //
-// Calls the orchestrator inline (bundled), starts Step Functions if needed,
-// and returns immediately with HTTP 202 { status: "pending", executionArn }.
+// Delegates to the orchestrator, which starts a Step Functions execution and
+// returns immediately with HTTP 202 { status: "pending", executionArn }.
 // No polling — the client drives the polling loop via GET /forecast/status.
-// Lambda timeout kept low (15 s): only orchestrator check + SFN StartExecution.
+// Lambda timeout kept low (15 s): only city normalisation + SFN StartExecution.
+// WeatherCache is no longer checked here — the state machine owns that check.
 
 api.route('GET /forecast', {
   handler: 'packages/functions/src/api/forecast.handler',
-  link: [weatherCacheTable],
   environment: {
     STATE_MACHINE_ARN: forecastPipeline.arn,
   },

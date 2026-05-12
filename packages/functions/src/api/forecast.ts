@@ -1,11 +1,8 @@
-import { randomUUID } from 'node:crypto';
-import { SFNClient, StartExecutionCommand } from '@aws-sdk/client-sfn';
-import { createLogger, getCurrentTimeSlot, normalizeCity, toDateString } from '@uweather/core';
+import { createLogger, normalizeCity } from '@uweather/core';
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import { handler as orchestratorHandler } from '../orchestrator.js';
 import { jsonAccepted, jsonBadRequest, jsonServerError } from './utils.js';
 
-const sfn = new SFNClient({});
 const log = createLogger({ function: 'api-forecast' });
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -18,69 +15,27 @@ export interface ForecastStartResponse {
   language: string;
 }
 
-// ── Pipeline helpers ──────────────────────────────────────────────────────────
-
-/**
- * Start the forecast pipeline (or resume an already-started execution).
- *
- * The orchestrator checks the WeatherCache first:
- *  - Cache miss  → orchestrator already started Step Functions; return its ARN.
- *  - Cache hit   → weather data is fresh but Step Functions wasn't started;
- *                  start it here so the AI agents can run against the cached data.
- */
-async function startPipeline(
-  city: string,
-  language: string,
-  userId: string,
-  correlationId: string,
-  coords?: { lat: number; lon: number },
-): Promise<string> {
-  const cityNormalized = normalizeCity(city);
-  const date = toDateString();
-  const timeSlot = getCurrentTimeSlot();
-
-  const result = await orchestratorHandler({ city, language, userId, correlationId, ...coords });
-
-  if (!result.cacheHit) {
-    return result.executionArn;
-  }
-
-  // Weather cache hit — orchestrator didn't start Step Functions; start it now.
-  const stateMachineArn = process.env.STATE_MACHINE_ARN;
-  if (!stateMachineArn) throw new Error('STATE_MACHINE_ARN not set');
-
-  const executionName = `${cityNormalized.replace(/[^a-z0-9]/g, '-')}-${date}-${randomUUID().slice(0, 8)}`;
-  const execution = await sfn.send(
-    new StartExecutionCommand({
-      stateMachineArn,
-      name: executionName,
-      input: JSON.stringify({ city: cityNormalized, language, date, userId, timeSlot, ...coords }),
-    }),
-  );
-  const executionArn = execution.executionArn;
-  if (!executionArn) throw new Error('Step Functions did not return an execution ARN');
-  return executionArn;
-}
-
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 /**
  * GET /forecast?city={city}&lang={lang}&userId={userId}
  *
- * Starts the forecast pipeline and returns immediately — no polling.
- * The client must poll GET /forecast/status?executionArn={arn} until the
- * forecast is ready (HTTP 200) or has failed (HTTP 500).
+ * Delegates to the orchestrator, which normalises the city and starts a Step
+ * Functions execution. Returns HTTP 202 immediately — no polling here.
+ * The state machine handles the weather-cache check internally (CheckCache →
+ * CacheDecision) and runs AI agents regardless of cache state.
  *
  * Query params:
  *   city     — required, non-empty
  *   lang     — optional, ISO 639-1, default "en"
  *   userId   — optional, caller-provided session ID; defaults to "anonymous"
+ *   lat/lon  — optional, pre-resolved coordinates from client geocoding
  *
  * Response 202 — ForecastStartResponse:
  *   { status: "pending", executionArn: string, city: string, language: string }
  *
- * The pipeline takes 15–30 s end-to-end (Bedrock + provider fetches).
- * Poll /forecast/status every 3–5 s until you receive HTTP 200 or 500.
+ * The pipeline takes 15–30 s end-to-end. Poll /forecast/status every 3–5 s
+ * until you receive HTTP 200 (success) or 500 (failure).
  */
 export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
   const requestId = context.awsRequestId;
@@ -104,7 +59,13 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
   reqLog.info('Forecast start request', { city, language, userId, coords });
 
   try {
-    const executionArn = await startPipeline(city, language, userId, requestId, coords);
+    const { executionArn } = await orchestratorHandler({
+      city,
+      language,
+      userId,
+      correlationId: requestId,
+      ...coords,
+    });
 
     reqLog.info('Pipeline started', { executionArn, city, language });
 
