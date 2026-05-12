@@ -29,25 +29,25 @@ importers:
   packages/functions:
     dependencies:
       '@aws-sdk/client-apigatewaymanagementapi':
-        specifier: ^3.0.0
+        specifier: ^3.1045.0
         version: 3.1045.0
       '@aws-sdk/client-bedrock-runtime':
-        specifier: ^3.0.0
+        specifier: ^3.1045.0
         version: 3.1045.0
       '@aws-sdk/client-dynamodb':
-        specifier: ^3.0.0
+        specifier: ^3.1045.0
         version: 3.1045.0
       '@aws-sdk/client-eventbridge':
-        specifier: ^3.0.0
+        specifier: ^3.1045.0
         version: 3.1045.0
       '@aws-sdk/client-s3':
-        specifier: ^3.0.0
+        specifier: ^3.1045.0
         version: 3.1045.0
       '@aws-sdk/client-sfn':
-        specifier: ^3.0.0
+        specifier: ^3.1045.0
         version: 3.1045.0
       '@aws-sdk/lib-dynamodb':
-        specifier: ^3.0.0
+        specifier: ^3.1045.0
         version: 3.1045.0(@aws-sdk/client-dynamodb@3.1045.0)
       '@uweather/core':
         specifier: workspace:*
@@ -428,7 +428,6 @@ packages:
   '@biomejs/cli-linux-arm64@1.9.4':
     resolution: {integrity: sha512-fJIW0+LYujdjUgJJuwesP4EjIBl/N/TcOX3IvIHJQNsAqvV2CHIogsmA94BPG6jZATS4Hi+xv4SkBBQSt1N4/g==}
     engines: {node: '>=14.21.3'}
-    cpu: [arm64]
     os: [linux]
 
   '@biomejs/cli-linux-x64-musl@1.9.4':
