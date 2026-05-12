@@ -26,6 +26,7 @@
  *                      ──► NormalizeParallelResults ──► SaveForecast ──► PipelineSuccess
  */
 import { forecastsTable, imagesBucket, imagesCdn, weatherCacheTable } from './storage.ts';
+import { xrayPermissions, xrayTransform } from './shared.ts';
 
 // ── SST Secrets ───────────────────────────────────────────────────────────────
 
@@ -42,31 +43,6 @@ export const sfnLogGroup = new aws.cloudwatch.LogGroup('SfnLogGroup', {
   name: $interpolate`/aws/states/uweather-forecast-${$app.stage}`,
   retentionInDays: 30,
 });
-
-// ── Shared X-Ray transform ────────────────────────────────────────────────────
-//
-// Applied to every Lambda via `transform.function`. Sets tracingConfig to
-// Active so the X-Ray daemon samples and records segments from each invocation.
-
-const xrayTransform: sst.aws.FunctionArgs['transform'] = {
-  function: (args) => {
-    args.tracingConfig = { mode: 'Active' };
-  },
-};
-
-// X-Ray IAM permissions — required for the Lambda execution role to send
-// trace segments and telemetry to the X-Ray service.
-const xrayPermissions = [
-  {
-    actions: [
-      'xray:PutTraceSegments',
-      'xray:PutTelemetryRecords',
-      'xray:GetSamplingRules',
-      'xray:GetSamplingTargets',
-    ],
-    resources: ['*' as const],
-  },
-];
 
 // ── EventBridge permissions (for pipeline stage reporting) ───────────────────
 //

@@ -13,29 +13,7 @@ import { forecastPipeline } from './pipeline.ts';
  * because api.ts depends on forecastPipeline.
  */
 import { forecastsTable, weatherCacheTable } from './storage.ts';
-
-// ── Shared X-Ray config ───────────────────────────────────────────────────────
-//
-// All route Lambdas get active X-Ray tracing so traces propagate from API
-// Gateway through Lambda into Step Functions (enabled on SFN in pipeline.ts).
-
-const xrayTransform: sst.aws.FunctionArgs['transform'] = {
-  function: (args) => {
-    args.tracingConfig = { mode: 'Active' };
-  },
-};
-
-const xrayPermissions = [
-  {
-    actions: [
-      'xray:PutTraceSegments',
-      'xray:PutTelemetryRecords',
-      'xray:GetSamplingRules',
-      'xray:GetSamplingTargets',
-    ],
-    resources: ['*' as const],
-  },
-];
+import { xrayPermissions, xrayTransform } from './shared.ts';
 
 /**
  * API Gateway HTTP API.
