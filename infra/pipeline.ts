@@ -672,9 +672,11 @@ export const forecastPipeline = new aws.sfn.StateMachine('ForecastPipeline', {
   type: 'STANDARD',
   // Phase 5: Active X-Ray tracing — propagates traces from API GW through SFN into Lambda
   tracingConfiguration: { enabled: true },
-  // SFN CloudWatch log delivery is configured separately via the AWS console or CLI
-  // (the log group is provisioned above; connect it there to avoid Pulumi schema drift).
-  loggingConfiguration: { level: 'OFF' },
+  loggingConfiguration: {
+    level: 'ERROR',
+    includeExecutionData: false,
+    destinations: [{ cloudwatchLogsLogGroup: { logGroupArn: sfnLogGroup.arn } }],
+  },
 });
 
 // ── Orchestrator Lambda ───────────────────────────────────────────────────────
