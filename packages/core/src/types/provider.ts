@@ -12,6 +12,10 @@ export interface ProviderInput {
    *  lat/lon directly — eliminating city-name ambiguity. */
   lat?: number;
   lon?: number;
+  /** Step Functions execution ARN injected via $$.Execution.Id.
+   *  Used by each provider to emit StageProgress events to EventBridge
+   *  so the WebSocket push Lambda can relay progress to the frontend. */
+  executionArn?: string;
 }
 
 /** Output shape for a successful provider Lambda invocation. */

@@ -96,7 +96,7 @@ const openWeatherFunction = new sst.aws.Function('OpenWeatherFn', {
   link: [weatherCacheTable, openWeatherApiKey],
   timeout: '90 seconds',
   memory: '256 MB',
-  permissions: xrayPermissions,
+  permissions: [...xrayPermissions, ...eventBridgePermissions],
   transform: xrayTransform,
 });
 
@@ -105,7 +105,7 @@ const weatherApiFunction = new sst.aws.Function('WeatherApiFn', {
   link: [weatherCacheTable, weatherApiKey],
   timeout: '90 seconds',
   memory: '256 MB',
-  permissions: xrayPermissions,
+  permissions: [...xrayPermissions, ...eventBridgePermissions],
   transform: xrayTransform,
 });
 
@@ -114,7 +114,7 @@ const openMeteoFunction = new sst.aws.Function('OpenMeteoFn', {
   link: [weatherCacheTable],
   timeout: '90 seconds',
   memory: '256 MB',
-  permissions: xrayPermissions,
+  permissions: [...xrayPermissions, ...eventBridgePermissions],
   transform: xrayTransform,
 });
 
@@ -323,6 +323,16 @@ function providerBranch(stateName: string, lambdaArn: string, providerName: stri
       [stateName]: {
         Type: 'Task',
         Resource: lambdaArn,
+        Parameters: {
+          'city.$': '$.city',
+          'language.$': '$.language',
+          'date.$': '$.date',
+          // Inject execution ARN so providers can emit StageProgress events
+          'executionArn.$': '$$.Execution.Id',
+          // Forward pre-resolved coordinates when available
+          'lat.$': '$.lat',
+          'lon.$': '$.lon',
+        },
         Retry: [
           {
             ErrorEquals: ['States.ALL'],

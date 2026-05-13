@@ -1,6 +1,7 @@
 import { createLogger, emitMetric, normalizeCity } from '@uweather/core';
 import type { ProviderInput, ProviderOutput } from '@uweather/core';
 import type { Context } from 'aws-lambda';
+import { reportStage } from '../lib/report-stage.js';
 import { weatherCacheService } from '../services/index.js';
 import { fetchOpenMeteo } from './open-meteo.client.js';
 
@@ -21,9 +22,11 @@ export async function handler(
   input: ProviderInput,
   context: Context,
 ): Promise<ProviderOutput<typeof PROVIDER_NAME>> {
-  const { city, date } = input;
+  const { city, date, executionArn } = input;
   const reqLog = log.child({ requestId: context.awsRequestId, city, provider: PROVIDER_NAME });
   reqLog.info('Fetching weather from Open-Meteo');
+
+  if (executionArn) await reportStage(executionArn, 'fetch_openmeteo', 'started');
 
   try {
     const coords =
@@ -37,6 +40,7 @@ export async function handler(
 
     reqLog.info('Weather cached', { city: cityNormalized, date });
     emitMetric('ProviderSuccess', 1, 'Count', { provider: PROVIDER_NAME });
+    if (executionArn) await reportStage(executionArn, 'fetch_openmeteo', 'done');
     return { provider: PROVIDER_NAME, success: true, data };
   } catch (err) {
     reqLog.error('Provider fetch failed', { error: (err as Error).message });
