@@ -142,17 +142,81 @@ function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+type ReqLog = ReturnType<typeof log.child>;
+
+/**
+ * Attempt to fetch landmarks from Wikidata SPARQL.
+ * Returns an empty array (and emits a metric) on any failure so the caller
+ * can fall through to the Bedrock path without additional try/catch logic.
+ */
+async function tryWikidataLandmarks(city: string, reqLog: ReqLog): Promise<string[]> {
+  try {
+    const landmarks = await reqLog.timed('Wikidata SPARQL query', () => fetchFromWikidata(city));
+    reqLog.info('Wikidata returned landmarks', { count: landmarks.length });
+    emitMetric('WikidataLandmarkCount', landmarks.length, 'Count', { city });
+    return landmarks;
+  } catch (err) {
+    reqLog.warn('Wikidata query failed (will fall back to Bedrock)', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    emitMetric('WikidataLandmarkError', 1, 'Count', { city });
+    return [];
+  }
+}
+
+/**
+ * Fetch landmarks from Bedrock Claude Haiku.
+ * Returns a single generic landmark string on failure so the pipeline always
+ * has something to work with (last-resort fallback).
+ */
+async function tryBedrockLandmarks(city: string, reqLog: ReqLog): Promise<string[]> {
+  try {
+    const start = Date.now();
+    const landmarks = await fetchFromBedrock(city);
+    const durationMs = Date.now() - start;
+    emitMetric('BedrockLatency', durationMs, 'Milliseconds', { agent: 'resolve-landmark' });
+    reqLog.info('Bedrock returned landmarks', { count: landmarks.length, durationMs });
+    return landmarks;
+  } catch (err) {
+    reqLog.error('Bedrock landmark fallback failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return [`the most iconic landmark of ${city}`];
+  }
+}
+
+/**
+ * Resolve a list of visually distinctive landmarks for a city.
+ *
+ * Strategy:
+ *   1. Query Wikidata SPARQL (free, no API key)
+ *   2. Fall back to Bedrock Claude Haiku if fewer than MIN_LANDMARKS returned
+ */
+async function resolveLandmarks(
+  city: string,
+  reqLog: ReqLog,
+): Promise<{ landmarks: string[]; source: 'wikidata' | 'bedrock' }> {
+  const wikidataLandmarks = await tryWikidataLandmarks(city, reqLog);
+
+  if (wikidataLandmarks.length >= MIN_LANDMARKS) {
+    return { landmarks: wikidataLandmarks, source: 'wikidata' };
+  }
+
+  reqLog.info('Falling back to Bedrock Haiku for landmarks', {
+    wikidataCount: wikidataLandmarks.length,
+    minRequired: MIN_LANDMARKS,
+  });
+
+  const bedrockLandmarks = await tryBedrockLandmarks(city, reqLog);
+  return { landmarks: bedrockLandmarks, source: 'bedrock' };
+}
+
 /**
  * ResolveLandmark Lambda — Step Functions task.
  *
  * Resolves a list of visually distinctive landmarks for a city, then picks
  * one at random. The selected landmark is threaded into both Agent 2 (funny text)
  * and Agent 3 (image generation).
- *
- * Strategy:
- *   1. Query Wikidata SPARQL (free, no API key) for landmarks
- *   2. If fewer than MIN_LANDMARKS results, fall back to Bedrock Claude Haiku
- *   3. Pick one landmark at random from the list
  */
 export async function handler(
   input: ResolveLandmarkInput,
@@ -162,44 +226,7 @@ export async function handler(
   if (input.executionArn) await reportStage(input.executionArn, 'landmark', 'started');
   reqLog.info('ResolveLandmark starting');
 
-  let landmarks: string[] = [];
-  let source: 'wikidata' | 'bedrock' = 'wikidata';
-
-  // 1. Try Wikidata SPARQL first
-  try {
-    landmarks = await reqLog.timed('Wikidata SPARQL query', () => fetchFromWikidata(input.city));
-    reqLog.info('Wikidata returned landmarks', { count: landmarks.length });
-    emitMetric('WikidataLandmarkCount', landmarks.length, 'Count', { city: input.city });
-  } catch (err) {
-    reqLog.warn('Wikidata query failed (will fall back to Bedrock)', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    emitMetric('WikidataLandmarkError', 1, 'Count', { city: input.city });
-  }
-
-  // 2. Fall back to Bedrock if Wikidata didn't return enough
-  if (landmarks.length < MIN_LANDMARKS) {
-    reqLog.info('Falling back to Bedrock Haiku for landmarks', {
-      wikidataCount: landmarks.length,
-      minRequired: MIN_LANDMARKS,
-    });
-    source = 'bedrock';
-
-    try {
-      const bedrockStart = Date.now();
-      landmarks = await fetchFromBedrock(input.city);
-      const durationMs = Date.now() - bedrockStart;
-      emitMetric('BedrockLatency', durationMs, 'Milliseconds', { agent: 'resolve-landmark' });
-      reqLog.info('Bedrock returned landmarks', { count: landmarks.length, durationMs });
-    } catch (err) {
-      reqLog.error('Bedrock landmark fallback failed', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-      // Last resort: generic fallback
-      landmarks = [`the most iconic landmark of ${input.city}`];
-      source = 'bedrock';
-    }
-  }
+  const { landmarks, source } = await resolveLandmarks(input.city, reqLog);
 
   const landmark = pickRandom(landmarks);
   reqLog.info('Landmark selected', { landmark, source, totalOptions: landmarks.length });

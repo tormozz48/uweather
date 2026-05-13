@@ -6,58 +6,65 @@ AI-powered weather app that delivers funny, location-aware forecasts with genera
 
 - **Language**: TypeScript (end-to-end)
 - **Runtime**: Node.js 20+
-- **IaC**: SST v3 (Ion) → CloudFormation
+- **IaC**: SST v3 (Ion) → CloudFormation / Pulumi
 - **Cloud**: AWS (serverless-only)
 - **Web**: Vite + React SPA (anonymous, no auth)
-- **AI**: Amazon Bedrock (Claude 4.5 Haiku for text, Titan Image Generator v2 for images)
+- **AI — text**: Amazon Bedrock (Claude Haiku 4.5 inference profile)
+- **AI — images**: Pixazo AI SDXL v1.0 REST API (external, no Bedrock)
 - **Database**: DynamoDB (multi-table, on-demand billing)
-- **Storage**: S3 (generated images) + CloudFront CDN
-- **Orchestration**: AWS Step Functions (parallel provider fetch → sequential AI pipeline)
-- **Observability**: CloudWatch Logs (structured JSON), Metrics, Dashboards, Alarms, X-Ray
+- **Storage**: S3 (generated images, 90-day lifecycle) + CloudFront CDN
+- **Orchestration**: AWS Step Functions Standard Workflow (parallel provider fan-out → sequential AI pipeline)
+- **Real-time**: API Gateway WebSocket + EventBridge (pipeline stage progress pushed to browser)
+- **Observability**: CloudWatch Logs (structured JSON/EMF), Metrics, Dashboards, Alarms, SNS, X-Ray
 
-## Project Structure
+## AWS Services
 
-```
-uweather/
-├── CLAUDE.md
-├── sst.config.ts
-├── package.json                  # workspace root
-├── docs/
-│   ├── adr/
-│   │   └── 001-architecture.md   # architecture decision record
-│   └── TECHNICAL_SPEC.md         # DynamoDB schemas, API, cache keys, prompts
-├── packages/
-│   ├── core/                     # shared types, weather models, utils
-│   │   └── src/
-│   │       ├── types/            # WeatherData, Forecast, User, etc.
-│   │       ├── weather/          # provider response transformers
-│   │       └── utils/            # logger, cache keys, validation
-│   ├── functions/                # all Lambda handlers
-│   │   └── src/
-│   │       ├── orchestrator.ts   # cache check → start Step Functions
-│   │       ├── providers/
-│   │       │   ├── openweather.ts
-│   │       │   ├── weatherapi.ts
-│   │       │   └── open-meteo.ts
-│   │       ├── agents/
-│   │       │   ├── compare.ts    # Agent 1: weather comparison
-│   │       │   ├── funny-text.ts # Agent 2: localized funny text
-│   │       │   └── image-gen.ts  # Agent 3: image generation
-│   │       │   └── webhook.ts    # grammY webhook handler
-│   │       └── api/
-│   │           ├── forecast.ts   # GET /forecast?city=X&lang=Y
-│   │           └── history.ts    # GET /history?userId=X
-│   └── web/                      # Vite + React SPA
-│       ├── src/
-│       ├── index.html
-│       └── vite.config.ts
-└── infra/                        # SST stack definitions
-    ├── storage.ts                # DynamoDB tables, S3 bucket
-    ├── api.ts                    # API Gateway, Lambda functions
-    ├── pipeline.ts               # Step Functions state machine
-    ├── web.ts                    # StaticSite (S3 + CloudFront)
-    └── monitoring.ts             # CloudWatch dashboards, alarms
-```
+All services used in the project, grouped by concern:
+
+**Compute**
+
+- **AWS Lambda** — one function per concern: 3 weather providers, 5 pipeline agents, 1 orchestrator, 4 HTTP API handlers, 3 WebSocket handlers, 1 save-forecast
+
+**Orchestration**
+
+- **AWS Step Functions** (Standard Workflow) — ForecastPipeline state machine; parallel fan-out for provider fetches, sequential AI agents, cache-decision Choice states, retry + catch on every task
+
+**API**
+
+- **Amazon API Gateway v2 (HTTP)** — REST API: `GET /health`, `GET /forecast`, `GET /forecast/status`, `GET /history`
+- **Amazon API Gateway v2 (WebSocket)** — real-time pipeline progress: `$connect`, `$disconnect`, managed via `execute-api:ManageConnections`
+
+**Eventing**
+
+- **Amazon EventBridge** — two rules on the default bus: (1) custom `uweather.pipeline / StageProgress` events emitted by pipeline Lambdas; (2) built-in `Step Functions Execution Status Change` events for SUCCEEDED/FAILED/TIMED_OUT/ABORTED
+
+**Storage**
+
+- **Amazon DynamoDB** — four tables, all on-demand:
+  - `WeatherCache` — normalized provider responses, 30-min TTL
+  - `Forecasts` — completed forecast results; GSIs: `UserHistoryIndex` (userId + createdAt), `ImageCacheIndex` (imageCacheKey + createdAt)
+  - `WebSocketConnections` — executionArn → connectionId mapping, 10-min TTL
+  - `Users` — web user profiles and language preferences
+- **Amazon S3** — `UweatherImages` bucket (CloudFront-restricted via OAC); 90-day object lifecycle
+- **Amazon CloudFront** — CDN for generated images (`ImagesCdn` Router) + SPA hosting (`StaticSite`)
+
+**AI**
+
+- **Amazon Bedrock** — Claude Haiku 4.5 invoked via inference profile (`us.anthropic.claude-haiku-4-5-20251001-v1:0`) for Agent 1 (compare), Agent 2 (funny text), and ResolveLandmark fallback
+
+**Observability**
+
+- **Amazon CloudWatch Logs** — structured JSON logs from all Lambdas; Step Functions execution logs (ERROR level, 30-day retention)
+- **Amazon CloudWatch Metrics** — custom EMF metrics: `WeatherCacheHit/Miss`, `ImageCacheHit/Miss`, `ProviderSuccess/Error`, `BedrockLatency`, `BedrockThrottled`, `ImageGenerationCount`, `LowConfidenceForecast`
+- **Amazon CloudWatch Dashboards** — `uweather-{stage}`: 7 panels (SFN executions, cache rates, provider reliability, Bedrock latency, throttling, API errors)
+- **Amazon CloudWatch Alarms** — 4 alarms: SFN failures, provider error rate (>5/5min), orchestrator P99 duration (>25s), Bedrock throttle rate (>3/5min)
+- **AWS X-Ray** — active tracing on all Lambdas and Step Functions; traces propagate end-to-end from API Gateway through SFN into each Lambda
+- **Amazon SNS** — `AlarmTopic` for alarm notifications (email subscription)
+
+**Security & Config**
+
+- **AWS IAM** — least-privilege execution roles per Lambda; separate policies for Bedrock InvokeModel, SFN StartExecution/DescribeExecution, EventBridge PutEvents, X-Ray, execute-api ManageConnections
+- **SST Secrets (AWS SSM Parameter Store)** — `OpenWeatherApiKey`, `WeatherApiKey`, `PixazoApiKey` (never in environment variables directly)
 
 ## Commands
 
@@ -101,3 +108,21 @@ Managed by SST via `Resource` bindings (not .env files):
 - `OPENWEATHER_API_KEY` — via SST Secret
 - `WEATHERAPI_KEY` — via SST Secret
 - Bedrock, DynamoDB, S3 — accessed via IAM roles (no keys needed)
+
+## Coding Principles
+
+These rules apply to all code in this repository. Enforce them on every new file and every edit.
+
+1. **No one-letter variables** — use descriptive names at every scope. `suggestion` not `s`, `forecast` not `f`, `index` not `i`, `prev` not the shadowed outer name.
+
+2. **Short functions** — aim for ≤20 lines per function. If a function is doing more than one thing, extract a named helper. Lambda handlers orchestrate; helpers compute.
+
+3. **Pure functions without side effects** — separate data transformation from I/O. A function that transforms data should not also log, emit metrics, or mutate state. Keep pure helpers at the top of the file, effectful orchestration at the bottom.
+
+4. **No magic numbers** — every numeric literal that carries meaning must be a named constant. Place it at the top of the file with a descriptive name and a comment explaining the unit (e.g. `const WIKIDATA_QUERY_TIMEOUT_MS = 8000`).
+
+5. **No magic strings** — repeated or meaningful string literals must be named constants. This includes API URLs, DynamoDB key prefixes, HTTP headers, cache-control directives, and regex patterns.
+
+6. **No code duplication** — before writing a utility function, check `packages/core/src/utils/` for an existing one. If the same logic appears in more than one file, extract it to core and import it. Key shared utilities: `degreesToCardinal` (wind), `stripMarkdownFence` (Bedrock response cleaning), `getTempBucket`, `buildImageCacheKey`.
+
+7. **Single responsibility** — each module, class, and function owns exactly one concern. Lambda handlers start the pipeline and return results; they delegate data shaping to pure helpers, DB access to service classes, and prompt building to `packages/core/src/prompts/`.
