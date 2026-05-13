@@ -70,9 +70,7 @@ export function PipelineProgress({ stages, connected }: Props) {
     (stage) => !stage.parallel && ['cache', 'fetch', 'compare', 'landmark'].includes(stage.id),
   );
   const parallelStages = VISUAL_STAGES.filter((stage) => stage.parallel);
-  const sequentialAfter = VISUAL_STAGES.filter(
-    (stage) => !stage.parallel && stage.id === 'save',
-  );
+  const sequentialAfter = VISUAL_STAGES.filter((stage) => !stage.parallel && stage.id === 'save');
 
   const allVisualStatuses = VISUAL_STAGES.map((visualStage) => ({
     ...visualStage,
@@ -127,7 +125,9 @@ export function PipelineProgress({ stages, connected }: Props) {
         sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}
       >
         {/* Sequential stages before parallel */}
-        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+        <Box
+          sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}
+        >
           {sequentialBefore.map((visualStage, index) => {
             const status = deriveVisualStatus(visualStage.stageIds, stages);
             const prevDone =
@@ -147,10 +147,8 @@ export function PipelineProgress({ stages, connected }: Props) {
         <Box sx={{ transform: 'rotate(90deg)' }}>
           <Connector
             done={
-              deriveVisualStatus(
-                sequentialBefore[sequentialBefore.length - 1].stageIds,
-                stages,
-              ) === 'done'
+              deriveVisualStatus(sequentialBefore[sequentialBefore.length - 1].stageIds, stages) ===
+              'done'
             }
           />
         </Box>

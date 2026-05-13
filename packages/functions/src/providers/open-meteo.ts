@@ -26,9 +26,10 @@ export async function handler(
   reqLog.info('Fetching weather from Open-Meteo');
 
   try {
-    const coords = input.lat !== undefined && input.lon !== undefined
-      ? { lat: input.lat, lon: input.lon }
-      : undefined;
+    const coords =
+      input.lat !== undefined && input.lon !== undefined
+        ? { lat: input.lat, lon: input.lon }
+        : undefined;
     const data = await fetchOpenMeteo(city, coords);
 
     const cityNormalized = normalizeCity(city);

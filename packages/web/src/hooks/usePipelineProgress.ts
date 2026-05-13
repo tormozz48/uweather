@@ -1,3 +1,4 @@
+import type { PipelineStageId, PipelineWsMessage } from '@uweather/core';
 /**
  * usePipelineProgress — React hook for real-time pipeline stage tracking.
  *
@@ -9,7 +10,6 @@
  * still poll for the result via the REST API.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PipelineStageId, PipelineWsMessage } from '@uweather/core';
 import { WS_URL } from '../api.js';
 
 export type StageStatus = 'pending' | 'active' | 'done';

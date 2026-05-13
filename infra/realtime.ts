@@ -1,3 +1,4 @@
+import { forecastPipeline } from './pipeline.ts';
 /**
  * infra/realtime.ts — Real-time pipeline progress via WebSocket + EventBridge
  *
@@ -16,7 +17,6 @@
  *   4. Client closes WS → $disconnect (TTL handles cleanup)
  */
 import { connectionsTable } from './storage.ts';
-import { forecastPipeline } from './pipeline.ts';
 
 // ── Shared X-Ray config (consistent with api.ts / pipeline.ts) ──────────────
 

@@ -1,3 +1,4 @@
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 /**
  * ConnectionService — DynamoDB CRUD for WebSocket connection tracking.
  *
@@ -6,8 +7,12 @@
  *   SK: connectionId
  *   ttl: epoch seconds (10 minutes from creation)
  */
-import { DeleteCommand, DynamoDBDocumentClient, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import {
+  DeleteCommand,
+  DynamoDBDocumentClient,
+  PutCommand,
+  QueryCommand,
+} from '@aws-sdk/lib-dynamodb';
 import { Resource } from 'sst';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));

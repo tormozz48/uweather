@@ -1,9 +1,9 @@
-import { type FormEvent } from 'react';
+import SearchIcon from '@mui/icons-material/Search';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Stack from '@mui/material/Stack';
-import SearchIcon from '@mui/icons-material/Search';
+import type { FormEvent } from 'react';
 import { CityAutocomplete, type CityCoords } from './CityAutocomplete.js';
 import { LanguageSelect } from './LanguageSelect.js';
 
@@ -27,7 +27,11 @@ export function SearchForm({
   onSubmit,
 }: SearchFormProps) {
   return (
-    <Box component="form" onSubmit={onSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+    <Box
+      component="form"
+      onSubmit={onSubmit}
+      sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}
+    >
       <Stack direction="row" spacing={1} alignItems="center">
         <CityAutocomplete city={city} isLoading={isLoading} onCityChange={onCityChange} />
         <LanguageSelect lang={lang} isLoading={isLoading} onLangChange={onLangChange} />

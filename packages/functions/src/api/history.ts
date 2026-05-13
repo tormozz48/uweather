@@ -12,7 +12,10 @@ const DEFAULT_HISTORY_LIMIT = 10;
 /** Clamp and parse the `limit` query param: integer in [MIN, MAX], default DEFAULT. */
 function parseLimit(raw: string | undefined): number {
   const parsed = Number.parseInt(raw ?? String(DEFAULT_HISTORY_LIMIT), 10);
-  return Math.min(MAX_HISTORY_LIMIT, Math.max(MIN_HISTORY_LIMIT, Number.isNaN(parsed) ? DEFAULT_HISTORY_LIMIT : parsed));
+  return Math.min(
+    MAX_HISTORY_LIMIT,
+    Math.max(MIN_HISTORY_LIMIT, Number.isNaN(parsed) ? DEFAULT_HISTORY_LIMIT : parsed),
+  );
 }
 
 /**

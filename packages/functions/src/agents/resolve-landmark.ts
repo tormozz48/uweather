@@ -1,5 +1,10 @@
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
-import { buildResolveLandmarkPrompt, createLogger, emitMetric, stripMarkdownFence } from '@uweather/core';
+import {
+  buildResolveLandmarkPrompt,
+  createLogger,
+  emitMetric,
+  stripMarkdownFence,
+} from '@uweather/core';
 import type { Context } from 'aws-lambda';
 import { reportStage } from '../lib/report-stage.js';
 

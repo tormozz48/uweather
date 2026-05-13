@@ -10,9 +10,7 @@ interface ForecastSectionProps {
 
 export function ForecastSection({ forecast }: ForecastSectionProps) {
   return (
-    <Box
-      sx={{ display: 'flex', flexDirection: 'column', gap: 2, animation: 'fadeIn 0.3s ease' }}
-    >
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, animation: 'fadeIn 0.3s ease' }}>
       <Box
         component="img"
         src={forecast.imageUrl}

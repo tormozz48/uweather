@@ -8,7 +8,7 @@
  *   const text = await callBedrock({ system, user, agent: 'compare', log: reqLog });
  */
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
-import { createLogger, emitMetric } from '@uweather/core';
+import { type createLogger, emitMetric } from '@uweather/core';
 
 /** Inference profile ID for Claude Haiku 4.5 (required for on-demand throughput). */
 export const HAIKU_MODEL_ID = 'us.anthropic.claude-haiku-4-5-20251001-v1:0';

@@ -1,5 +1,10 @@
 import { transformOpenMeteo } from '@uweather/core';
-import type { OMGeocodingResponse, OMGeocodingResult, OMWeatherResponse, UnifiedWeatherData } from '@uweather/core';
+import type {
+  OMGeocodingResponse,
+  OMGeocodingResult,
+  OMWeatherResponse,
+  UnifiedWeatherData,
+} from '@uweather/core';
 
 const GEOCODING_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
@@ -39,7 +44,14 @@ export async function fetchOpenMeteo(
   if (coords) {
     // Coordinates already known — skip geocoding, use a minimal stub for the
     // transformer (city/country come from UnifiedWeatherData returned by the API).
-    geoResult = { id: 0, latitude: coords.lat, longitude: coords.lon, name: city, country: '', country_code: '' };
+    geoResult = {
+      id: 0,
+      latitude: coords.lat,
+      longitude: coords.lon,
+      name: city,
+      country: '',
+      country_code: '',
+    };
   } else {
     // Step 1: Geocode the city name to lat/lon
     const geoUrl = `${GEOCODING_URL}?name=${encodeURIComponent(city)}&count=1&language=en&format=json`;

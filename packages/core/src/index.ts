@@ -51,9 +51,7 @@ export type {
   OMWeatherResponse,
 } from './weather/index.js';
 
-export {
-  VISUAL_STAGES,
-} from './pipeline-stages.js';
+export { VISUAL_STAGES } from './pipeline-stages.js';
 
 export type {
   PipelineStageId,

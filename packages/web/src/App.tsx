@@ -1,8 +1,8 @@
-import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
+import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { getHistory, pollForecastResult, startForecast } from './api.js';
 import type { ForecastResponse } from './api.js';
 import { ErrorCard } from './components/ErrorCard.js';
@@ -110,9 +110,7 @@ export function App() {
         component="header"
         sx={{ textAlign: 'center', pt: { xs: 4, sm: 6 }, pb: { xs: 3, sm: 4 } }}
       >
-        <Typography sx={{ fontSize: '3rem', display: 'block', lineHeight: 1, mb: 1 }}>
-          🌤️
-        </Typography>
+        <Typography sx={{ fontSize: '3rem', display: 'block', lineHeight: 1, mb: 1 }}>🌤️</Typography>
         <Typography variant="h4" fontWeight={700} sx={{ letterSpacing: '-0.5px' }}>
           uweather
         </Typography>
@@ -138,9 +136,7 @@ export function App() {
           <PipelineProgress stages={progress.stages} connected={progress.connected} />
         )}
 
-        {state.status === 'error' && (
-          <ErrorCard message={state.message} onRetry={handleRetry} />
-        )}
+        {state.status === 'error' && <ErrorCard message={state.message} onRetry={handleRetry} />}
 
         {state.status === 'success' && <ForecastSection forecast={state.forecast} />}
 

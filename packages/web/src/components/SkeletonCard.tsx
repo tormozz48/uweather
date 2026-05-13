@@ -1,6 +1,6 @@
+import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import MuiSkeleton from '@mui/material/Skeleton';
-import Box from '@mui/material/Box';
 
 export function SkeletonCard() {
   return (

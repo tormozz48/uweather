@@ -51,7 +51,11 @@ export function HistoryList({ forecasts, onSelect }: HistoryListProps) {
               <Typography variant="caption" color="text.secondary" sx={{ mr: 2 }}>
                 {forecast.date}
               </Typography>
-              <Typography variant="body2" fontWeight={600} sx={{ minWidth: 40, textAlign: 'right' }}>
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                sx={{ minWidth: 40, textAlign: 'right' }}
+              >
                 {Math.round(forecast.weather.temperature)}°C
               </Typography>
             </ListItemButton>
