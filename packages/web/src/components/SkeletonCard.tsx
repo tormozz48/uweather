@@ -1,11 +1,17 @@
+import Paper from '@mui/material/Paper';
+import MuiSkeleton from '@mui/material/Skeleton';
+import Box from '@mui/material/Box';
+
 export function SkeletonCard() {
   return (
-    <div className="skeleton-card">
-      <div className="skeleton skeleton--title" />
-      <div className="skeleton skeleton--image" />
-      <div className="skeleton skeleton--line" />
-      <div className="skeleton skeleton--line skeleton--short" />
-      <div className="skeleton skeleton--line" />
-    </div>
+    <Paper sx={{ p: 2.5 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.75 }}>
+        <MuiSkeleton variant="text" width="55%" height={28} />
+        <MuiSkeleton variant="rectangular" height={220} sx={{ borderRadius: 1 }} />
+        <MuiSkeleton variant="text" />
+        <MuiSkeleton variant="text" width="70%" />
+        <MuiSkeleton variant="text" />
+      </Box>
+    </Paper>
   );
 }

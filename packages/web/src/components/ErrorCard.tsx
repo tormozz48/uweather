@@ -1,3 +1,8 @@
+import RefreshIcon from '@mui/icons-material/Refresh';
+import Alert from '@mui/material/Alert';
+import AlertTitle from '@mui/material/AlertTitle';
+import Button from '@mui/material/Button';
+
 interface ErrorCardProps {
   message: string;
   onRetry: () => void;
@@ -5,12 +10,23 @@ interface ErrorCardProps {
 
 export function ErrorCard({ message, onRetry }: ErrorCardProps) {
   return (
-    <div className="error-card">
-      <span className="error-card__icon">😕</span>
-      <p className="error-card__message">{message}</p>
-      <button type="button" className="error-card__retry" onClick={onRetry}>
-        Try again
-      </button>
-    </div>
+    <Alert
+      severity="error"
+      action={
+        <Button
+          color="error"
+          size="small"
+          variant="outlined"
+          startIcon={<RefreshIcon />}
+          onClick={onRetry}
+          sx={{ whiteSpace: 'nowrap' }}
+        >
+          Try again
+        </Button>
+      }
+    >
+      <AlertTitle>Something went wrong</AlertTitle>
+      {message}
+    </Alert>
   );
 }

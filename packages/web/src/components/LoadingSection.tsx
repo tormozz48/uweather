@@ -1,12 +1,14 @@
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
 import { SkeletonCard } from './SkeletonCard.js';
 
 export function LoadingSection() {
   return (
-    <div className="loading-section">
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
       <SkeletonCard />
-      <p className="loading-section__hint">
+      <Typography variant="caption" color="text.secondary" align="center">
         Consulting 3 weather services and generating a custom image… this takes 15–30 seconds.
-      </p>
-    </div>
+      </Typography>
+    </Box>
   );
 }

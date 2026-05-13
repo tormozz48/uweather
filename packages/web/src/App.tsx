@@ -1,4 +1,8 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import Box from '@mui/material/Box';
+import Container from '@mui/material/Container';
+import Divider from '@mui/material/Divider';
+import Typography from '@mui/material/Typography';
 import { getHistory, pollForecastResult, startForecast } from './api.js';
 import type { ForecastResponse } from './api.js';
 import { ErrorCard } from './components/ErrorCard.js';
@@ -16,6 +20,8 @@ type AppState =
   | { status: 'loading'; executionArn: string }
   | { status: 'success'; forecast: ForecastResponse }
   | { status: 'error'; message: string };
+
+const MAX_HISTORY_DISPLAY = 10;
 
 export function App() {
   const [city, setCity] = useState('');
@@ -37,8 +43,6 @@ export function App() {
         // History is best-effort — silently ignore errors
       });
   }, [sessionId]);
-
-  const MAX_HISTORY_DISPLAY = 10;
 
   const addToHistory = useCallback((forecast: ForecastResponse) => {
     setHistory((prev) => {
@@ -64,23 +68,20 @@ export function App() {
   }, []);
 
   const handleSubmit = useCallback(
-    async (e: FormEvent) => {
-      e.preventDefault();
+    async (event: FormEvent) => {
+      event.preventDefault();
       const trimmed = city.trim();
       if (!trimmed || state.status === 'loading') return;
 
       try {
-        // Start the pipeline — get executionArn for WebSocket tracking
         const arn = await startForecast(trimmed, lang, sessionId, coords);
         setState({ status: 'loading', executionArn: arn });
 
-        // If WebSocket is not available, fall back to REST polling immediately
         if (!import.meta.env.VITE_WS_URL) {
           const forecast = await pollForecastResult(arn);
           setState({ status: 'success', forecast });
           addToHistory(forecast);
         }
-        // With WebSocket, the completion useEffect handles the result fetch
       } catch (err) {
         setState({
           status: 'error',
@@ -101,14 +102,29 @@ export function App() {
   };
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <span className="app-header__logo">🌤️</span>
-        <h1 className="app-header__title">uweather</h1>
-        <p className="app-header__tagline">AI-powered forecasts with a sense of humour</p>
-      </header>
+    <Container
+      maxWidth="sm"
+      sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', px: 2 }}
+    >
+      <Box
+        component="header"
+        sx={{ textAlign: 'center', pt: { xs: 4, sm: 6 }, pb: { xs: 3, sm: 4 } }}
+      >
+        <Typography sx={{ fontSize: '3rem', display: 'block', lineHeight: 1, mb: 1 }}>
+          🌤️
+        </Typography>
+        <Typography variant="h4" fontWeight={700} sx={{ letterSpacing: '-0.5px' }}>
+          uweather
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+          AI-powered forecasts with a sense of humour
+        </Typography>
+      </Box>
 
-      <main className="app-main">
+      <Box
+        component="main"
+        sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, pb: 5 }}
+      >
         <SearchForm
           city={city}
           lang={lang}
@@ -122,18 +138,23 @@ export function App() {
           <PipelineProgress stages={progress.stages} connected={progress.connected} />
         )}
 
-        {state.status === 'error' && <ErrorCard message={state.message} onRetry={handleRetry} />}
+        {state.status === 'error' && (
+          <ErrorCard message={state.message} onRetry={handleRetry} />
+        )}
 
         {state.status === 'success' && <ForecastSection forecast={state.forecast} />}
 
         {state.status !== 'loading' && (
           <HistoryList forecasts={history} onSelect={handleHistorySelect} />
         )}
-      </main>
+      </Box>
 
-      <footer className="app-footer">
-        <p>Powered by AWS Bedrock · Weather from OpenWeatherMap, WeatherAPI, Open-Meteo</p>
-      </footer>
-    </div>
+      <Divider />
+      <Box component="footer" sx={{ textAlign: 'center', py: 3 }}>
+        <Typography variant="caption" color="text.secondary">
+          Powered by AWS Bedrock · Weather from OpenWeatherMap, WeatherAPI, Open-Meteo
+        </Typography>
+      </Box>
+    </Container>
   );
 }

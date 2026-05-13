@@ -1,4 +1,9 @@
 import { type FormEvent } from 'react';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
+import Stack from '@mui/material/Stack';
+import SearchIcon from '@mui/icons-material/Search';
 import { CityAutocomplete, type CityCoords } from './CityAutocomplete.js';
 import { LanguageSelect } from './LanguageSelect.js';
 
@@ -10,7 +15,7 @@ interface SearchFormProps {
   isLoading: boolean;
   onCityChange: (city: string, coords?: CityCoords) => void;
   onLangChange: (lang: string) => void;
-  onSubmit: (e: FormEvent) => void;
+  onSubmit: (event: FormEvent) => void;
 }
 
 export function SearchForm({
@@ -22,15 +27,22 @@ export function SearchForm({
   onSubmit,
 }: SearchFormProps) {
   return (
-    <form className="search-form" onSubmit={onSubmit}>
-      <div className="search-form__row">
+    <Box component="form" onSubmit={onSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+      <Stack direction="row" spacing={1} alignItems="center">
         <CityAutocomplete city={city} isLoading={isLoading} onCityChange={onCityChange} />
         <LanguageSelect lang={lang} isLoading={isLoading} onLangChange={onLangChange} />
-      </div>
+      </Stack>
 
-      <button className="search-form__button" type="submit" disabled={!city.trim() || isLoading}>
+      <Button
+        type="submit"
+        variant="contained"
+        size="large"
+        fullWidth
+        disabled={!city.trim() || isLoading}
+        startIcon={isLoading ? <CircularProgress size={18} color="inherit" /> : <SearchIcon />}
+      >
         {isLoading ? 'Generating forecast…' : 'Get forecast'}
-      </button>
-    </form>
+      </Button>
+    </Box>
   );
 }

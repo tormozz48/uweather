@@ -1,6 +1,14 @@
+import AirIcon from '@mui/icons-material/Air';
+import UmbrellaIcon from '@mui/icons-material/Umbrella';
+import WaterDropIcon from '@mui/icons-material/WaterDrop';
+import WbSunnyIcon from '@mui/icons-material/WbSunny';
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
+import Typography from '@mui/material/Typography';
 import type { ForecastResponse } from '../api.js';
 import { CONDITION_EMOJI } from '../constants/weather.js';
-import { Stat } from './Stat.js';
 
 interface WeatherCardProps {
   forecast: ForecastResponse;
@@ -12,30 +20,67 @@ export function WeatherCard({ forecast }: WeatherCardProps) {
   const conditionLabel = weather.condition.replace('_', ' ');
 
   return (
-    <div className="weather-card">
-      <div className="weather-card__header">
-        <span className="weather-card__emoji">{emoji}</span>
-        <div>
-          <h2 className="weather-card__city">{forecast.city}</h2>
-          <p className="weather-card__date">
-            {forecast.date} · {conditionLabel}
-          </p>
-        </div>
-      </div>
+    <Card>
+      <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
+        {/* City + condition header */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+          <Typography sx={{ fontSize: '2.4rem', lineHeight: 1 }}>{emoji}</Typography>
+          <Box>
+            <Typography variant="h5" fontWeight={700} lineHeight={1.2}>
+              {forecast.city}
+            </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ textTransform: 'capitalize' }}
+            >
+              {forecast.date} · {conditionLabel}
+            </Typography>
+          </Box>
+        </Box>
 
-      <div className="weather-card__temps">
-        <span className="weather-card__temp">{Math.round(weather.temperature)}°C</span>
-        <span className="weather-card__feels-like">feels like {Math.round(weather.feelsLike)}°C</span>
-      </div>
+        {/* Temperature */}
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, mb: 2.5 }}>
+          <Typography variant="h3" fontWeight={700} sx={{ letterSpacing: '-1px' }}>
+            {Math.round(weather.temperature)}°C
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            feels like {Math.round(weather.feelsLike)}°C
+          </Typography>
+        </Box>
 
-      <div className="weather-card__stats">
-        <Stat icon="💧" label="Humidity" value={`${weather.humidity}%`} />
-        <Stat icon="💨" label="Wind" value={`${Math.round(weather.windSpeed)} km/h ${weather.windDirection}`} />
-        {weather.precipitation > 0 && (
-          <Stat icon="🌂" label="Rain" value={`${weather.precipitation.toFixed(1)} mm`} />
-        )}
-        {weather.uvIndex > 0 && <Stat icon="🔆" label="UV Index" value={String(weather.uvIndex)} />}
-      </div>
-    </div>
+        {/* Stats chips with MUI icons */}
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+          <Chip
+            size="small"
+            icon={<WaterDropIcon fontSize="small" />}
+            label={`Humidity ${weather.humidity}%`}
+            variant="outlined"
+          />
+          <Chip
+            size="small"
+            icon={<AirIcon fontSize="small" />}
+            label={`Wind ${Math.round(weather.windSpeed)} km/h ${weather.windDirection}`}
+            variant="outlined"
+          />
+          {weather.precipitation > 0 && (
+            <Chip
+              size="small"
+              icon={<UmbrellaIcon fontSize="small" />}
+              label={`Rain ${weather.precipitation.toFixed(1)} mm`}
+              variant="outlined"
+            />
+          )}
+          {weather.uvIndex > 0 && (
+            <Chip
+              size="small"
+              icon={<WbSunnyIcon fontSize="small" />}
+              label={`UV ${weather.uvIndex}`}
+              variant="outlined"
+            />
+          )}
+        </Box>
+      </CardContent>
+    </Card>
   );
 }

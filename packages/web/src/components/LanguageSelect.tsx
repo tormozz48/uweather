@@ -1,3 +1,6 @@
+import FormControl from '@mui/material/FormControl';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
 import { LANGUAGES } from '../constants/weather.js';
 
 interface LanguageSelectProps {
@@ -8,17 +11,18 @@ interface LanguageSelectProps {
 
 export function LanguageSelect({ lang, isLoading, onLangChange }: LanguageSelectProps) {
   return (
-    <select
-      className="search-form__lang"
-      value={lang}
-      onChange={(e) => onLangChange(e.target.value)}
-      disabled={isLoading}
-    >
-      {LANGUAGES.map((language) => (
-        <option key={language.code} value={language.code}>
-          {language.label}
-        </option>
-      ))}
-    </select>
+    <FormControl size="small" sx={{ minWidth: 140 }}>
+      <Select
+        value={lang}
+        onChange={(event) => onLangChange(event.target.value)}
+        disabled={isLoading}
+      >
+        {LANGUAGES.map((language) => (
+          <MenuItem key={language.code} value={language.code}>
+            {language.label}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
   );
 }
