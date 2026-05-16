@@ -4,10 +4,12 @@ import { forecastPipeline } from './pipeline.ts';
  *                Phase 5 updates: X-Ray tracing on all route Lambdas
  *
  * Routes:
- *   GET  /health              — liveness check
- *   GET  /forecast            — start AI forecast pipeline, returns 202 + executionArn
- *   GET  /forecast/status     — poll pipeline status; returns 202 (pending) or 200 (done)
- *   GET  /history             — get user forecast history
+ *   GET  /health                    — liveness check
+ *   GET  /forecast                  — start AI forecast pipeline, returns 202 + executionArn
+ *   GET  /forecast/status           — poll pipeline status; returns 202 (pending) or 200 (done)
+ *   GET  /forecast/{forecastId}     — fetch a single forecast by ULID (shareable links)
+ *   GET  /og/forecast/{forecastId}  — OG meta tags HTML for social sharing previews
+ *   GET  /history                   — get user forecast history
  *
  * Import order requirement: pipeline.ts must be imported before this file
  * because api.ts depends on forecastPipeline.
@@ -141,6 +143,35 @@ api.route('GET /forecast/status', {
   permissions: [...sfnDescribePermissions, ...xrayPermissions],
   timeout: '15 seconds',
   memory: '256 MB',
+  transform: xrayTransform,
+});
+
+// ── GET /forecast/{forecastId} ────────────────────────────────────────────────
+//
+// Returns a single forecast by ULID. Powers shareable direct links —
+// no authentication required (the app is anonymous).
+
+api.route('GET /forecast/{forecastId}', {
+  handler: 'packages/functions/src/api/forecast-by-id.handler',
+  link: [forecastsTable],
+  timeout: '15 seconds',
+  memory: '256 MB',
+  permissions: xrayPermissions,
+  transform: xrayTransform,
+});
+
+// ── GET /og/forecast/{forecastId} ─────────────────────────────────────────────
+//
+// Returns a minimal HTML page with Open Graph meta tags for social sharing
+// previews. Bot user agents (Telegram, Slack, Twitter, etc.) are redirected
+// here by the CloudFront Function on the StaticSite.
+
+api.route('GET /og/forecast/{forecastId}', {
+  handler: 'packages/functions/src/api/og-forecast.handler',
+  link: [forecastsTable],
+  timeout: '15 seconds',
+  memory: '256 MB',
+  permissions: xrayPermissions,
   transform: xrayTransform,
 });
 

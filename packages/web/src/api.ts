@@ -132,3 +132,8 @@ export function getHistory(userId: string, limit = 10): Promise<HistoryResponse>
   const params = new URLSearchParams({ userId, limit: String(limit) });
   return apiFetch<HistoryResponse>(`/history?${params}`);
 }
+
+/** Fetch a single forecast by its ID (for shareable links). */
+export function getForecastById(forecastId: string): Promise<ForecastResponse> {
+  return apiFetch<ForecastResponse>(`/forecast/${encodeURIComponent(forecastId)}`);
+}
