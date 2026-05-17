@@ -50,19 +50,19 @@ export function HomePage() {
   const geolocation = useGeolocation();
   const reverseGeocode = useReverseGeocode();
 
+  const { lookup: lookupCity } = reverseGeocode;
+
   // When geolocation succeeds, reverse-geocode to a city name and populate the form
   useEffect(() => {
     if (geolocation.status !== 'success' || !geolocation.coords) return;
     const { lat, lon } = geolocation.coords;
-    reverseGeocode.lookup(lat, lon).then((resolved) => {
+    lookupCity(lat, lon).then((resolved) => {
       if (resolved) {
         setCity(resolved.name);
         setCoords({ lat: resolved.lat, lon: resolved.lon });
       }
     });
-    // reverseGeocode.lookup is stable (useCallback); geolocation.coords identity changes on each success
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geolocation.status, geolocation.coords]);
+  }, [geolocation.status, geolocation.coords, lookupCity]);
 
   // WebSocket pipeline progress — active only during loading
   const executionArn = state.status === 'loading' ? state.executionArn : null;
