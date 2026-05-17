@@ -126,3 +126,5 @@ These rules apply to all code in this repository. Enforce them on every new file
 6. **No code duplication** — before writing a utility function, check `packages/core/src/utils/` for an existing one. If the same logic appears in more than one file, extract it to core and import it. Key shared utilities: `degreesToCardinal` (wind), `stripMarkdownFence` (Bedrock response cleaning), `getTempBucket`, `buildImageCacheKey`.
 
 7. **Single responsibility** — each module, class, and function owns exactly one concern. Lambda handlers start the pipeline and return results; they delegate data shaping to pure helpers, DB access to service classes, and prompt building to `packages/core/src/prompts/`.
+
+8. **Keep README.md in sync** — after any change that affects content already documented in `README.md` (stack, commands, API surface, infrastructure layout, observability setup, environment variables, repo structure, dev conventions), update the relevant section of `README.md` in the same commit.
