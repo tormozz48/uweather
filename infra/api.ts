@@ -42,52 +42,28 @@ const xrayPermissions = [
 // ── CORS allowed origins ──────────────────────────────────────────────────────
 //
 // dev: allow all origins (needed for `sst dev` and local Vite server).
-// prod: restrict to the web SPA CloudFront domain to prevent unauthorized API
-//       consumers from running up Bedrock/Pixazo costs.
+// prod: restrict to the custom web domain to prevent unauthorized API consumers
+//       from running up Bedrock/Pixazo costs.
 //
-// Because api.ts is imported before web.ts (web needs api.url for its build),
-// the CloudFront URL cannot be derived automatically at deploy time.
-//
-// Workflow for prod:
-//   1. Run `pnpm sst deploy --stage prod` once — note the Web URL in outputs.
-//   2. On subsequent deploys, export the URL:
-//        WEB_ORIGIN=https://dXXXX.cloudfront.net pnpm deploy-prod
-//      or set it in your CI/CD environment.
-//
-// First deploy: WEB_ORIGIN is not yet known — CORS temporarily allows '*'.
-// Subsequent deploys: WEB_ORIGIN must be set to the CloudFront URL to lock down
-// CORS and prevent unauthorized API consumers from running up Bedrock/Pixazo costs.
-//
-// After the first prod deploy, always export:
-//   WEB_ORIGIN=https://dXXXX.cloudfront.net pnpm deploy-prod
+// Both stages use a fixed, known domain (uweather.eu / dev.uweather.eu), so
+// there is no chicken-and-egg problem with deriving the origin at deploy time.
 
-const FIRST_PROD_DEPLOY_MARKER = 'FIRST_DEPLOY';
+const PROD_WEB_ORIGIN = 'https://uweather.eu';
 
-const allowedOrigins = (() => {
-  if ($app.stage !== 'prod') return ['*'];
-  const origin = process.env.WEB_ORIGIN?.trim();
-  if (!origin) {
-    if (process.env.FIRST_PROD_DEPLOY === FIRST_PROD_DEPLOY_MARKER) {
-      // biome-ignore lint/suspicious/noConsole: SST deploy-time warning (no structured logger available at infra level)
-      console.warn(
-        '[CORS] First prod deploy — WEB_ORIGIN not set, temporarily allowing all origins. ' +
-          'Set WEB_ORIGIN on the next deploy to lock down CORS.',
-      );
-      return ['*'];
-    }
-    throw new Error(
-      'WEB_ORIGIN environment variable is required for production deploys. ' +
-        'Set it to the CloudFront web URL (e.g. WEB_ORIGIN=https://dXXXX.cloudfront.net). ' +
-        'For the very first deploy, use FIRST_PROD_DEPLOY=FIRST_DEPLOY to skip this check.',
-    );
-  }
-  return [origin];
-})();
+const allowedOrigins = $app.stage === 'prod' ? [PROD_WEB_ORIGIN] : ['*'];
 
 /**
  * API Gateway HTTP API.
+ *
+ * Custom domain: api.uweather.eu (prod) / api.dev.uweather.eu (dev).
+ * SST resolves the Route 53 hosted zone for uweather.eu and provisions an
+ * ACM certificate + DNS record automatically on every deploy.
  */
 export const api = new sst.aws.ApiGatewayV2('Api', {
+  domain: {
+    name: $app.stage === 'prod' ? 'api.uweather.eu' : 'api.dev.uweather.eu',
+    dns: sst.aws.dns(),
+  },
   cors: {
     allowMethods: ['GET', 'POST'],
     allowHeaders: ['Content-Type'],

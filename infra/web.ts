@@ -53,6 +53,14 @@ const securityHeadersPolicy = new aws.cloudfront.ResponseHeadersPolicy('WebSecur
 export const web = new sst.aws.StaticSite('Web', {
   path: 'packages/web',
 
+  // Custom domain: uweather.eu (prod) / dev.uweather.eu (dev).
+  // SST resolves the Route 53 hosted zone for uweather.eu and provisions an
+  // ACM certificate (us-east-1) + DNS record automatically on every deploy.
+  domain: {
+    name: $app.stage === 'prod' ? 'uweather.eu' : 'dev.uweather.eu',
+    dns: sst.aws.dns(),
+  },
+
   build: {
     command: 'pnpm build',
     output: 'dist',
