@@ -4,6 +4,7 @@ import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { getHistory, pollForecastResult, startForecast } from '../api.js';
+import { LANGUAGES } from '../constants/weather.js';
 import type { ForecastResponse } from '../api.js';
 import { ErrorCard } from '../components/ErrorCard.js';
 import { ForecastSection } from '../components/ForecastSection.js';
@@ -14,6 +15,19 @@ import type { CityCoords } from '../components/SearchForm.js';
 import { useForecastCompletion } from '../hooks/useForecastCompletion.js';
 import { usePipelineProgress } from '../hooks/usePipelineProgress.js';
 import { getSessionId } from '../lib/session.js';
+
+const FALLBACK_LANGUAGE = 'en';
+
+function detectBrowserLanguage(): string {
+  const supportedCodes = new Set(LANGUAGES.map((language) => language.code));
+  for (const browserLang of navigator.languages ?? [navigator.language]) {
+    const exact = browserLang.toLowerCase();
+    if (supportedCodes.has(exact)) return exact;
+    const primary = exact.split('-')[0];
+    if (supportedCodes.has(primary)) return primary;
+  }
+  return FALLBACK_LANGUAGE;
+}
 
 type AppState =
   | { status: 'idle' }
@@ -26,7 +40,7 @@ const MAX_HISTORY_DISPLAY = 10;
 export function HomePage() {
   const [city, setCity] = useState('');
   const [coords, setCoords] = useState<CityCoords | undefined>(undefined);
-  const [lang, setLang] = useState('en');
+  const [lang, setLang] = useState(detectBrowserLanguage);
   const [state, setState] = useState<AppState>({ status: 'idle' });
   const [history, setHistory] = useState<ForecastResponse[]>([]);
   const sessionId = getSessionId();
