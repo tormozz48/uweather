@@ -13,7 +13,9 @@ import { PipelineProgress } from '../components/PipelineProgress.js';
 import { SearchForm } from '../components/SearchForm.js';
 import type { CityCoords } from '../components/SearchForm.js';
 import { useForecastCompletion } from '../hooks/useForecastCompletion.js';
+import { useGeolocation } from '../hooks/useGeolocation.js';
 import { usePipelineProgress } from '../hooks/usePipelineProgress.js';
+import { useReverseGeocode } from '../hooks/useReverseGeocode.js';
 import { getSessionId } from '../lib/session.js';
 
 const FALLBACK_LANGUAGE = 'en';
@@ -44,6 +46,23 @@ export function HomePage() {
   const [state, setState] = useState<AppState>({ status: 'idle' });
   const [history, setHistory] = useState<ForecastResponse[]>([]);
   const sessionId = getSessionId();
+
+  const geolocation = useGeolocation();
+  const reverseGeocode = useReverseGeocode();
+
+  // When geolocation succeeds, reverse-geocode to a city name and populate the form
+  useEffect(() => {
+    if (geolocation.status !== 'success' || !geolocation.coords) return;
+    const { lat, lon } = geolocation.coords;
+    reverseGeocode.lookup(lat, lon).then((resolved) => {
+      if (resolved) {
+        setCity(resolved.name);
+        setCoords({ lat: resolved.lat, lon: resolved.lon });
+      }
+    });
+    // reverseGeocode.lookup is stable (useCallback); geolocation.coords identity changes on each success
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geolocation.status, geolocation.coords]);
 
   // WebSocket pipeline progress — active only during loading
   const executionArn = state.status === 'loading' ? state.executionArn : null;
@@ -141,8 +160,10 @@ export function HomePage() {
           city={city}
           lang={lang}
           isLoading={state.status === 'loading'}
+          geolocationStatus={geolocation.status}
           onCityChange={handleCityChange}
           onLangChange={setLang}
+          onRequestLocation={geolocation.request}
           onSubmit={handleSubmit}
         />
 
