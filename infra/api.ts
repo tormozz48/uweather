@@ -54,13 +54,32 @@ const xrayPermissions = [
 //        WEB_ORIGIN=https://dXXXX.cloudfront.net pnpm deploy-prod
 //      or set it in your CI/CD environment.
 //
-// If WEB_ORIGIN is unset in prod, CORS falls back to '*' with a warning.
+// First deploy: WEB_ORIGIN is not yet known — CORS temporarily allows '*'.
+// Subsequent deploys: WEB_ORIGIN must be set to the CloudFront URL to lock down
+// CORS and prevent unauthorized API consumers from running up Bedrock/Pixazo costs.
+//
+// After the first prod deploy, always export:
+//   WEB_ORIGIN=https://dXXXX.cloudfront.net pnpm deploy-prod
+
+const FIRST_PROD_DEPLOY_MARKER = 'FIRST_DEPLOY';
 
 const allowedOrigins = (() => {
   if ($app.stage !== 'prod') return ['*'];
   const origin = process.env.WEB_ORIGIN?.trim();
   if (!origin) {
-    return ['*'];
+    if (process.env.FIRST_PROD_DEPLOY === FIRST_PROD_DEPLOY_MARKER) {
+      // biome-ignore lint/suspicious/noConsole: SST deploy-time warning (no structured logger available at infra level)
+      console.warn(
+        '[CORS] First prod deploy — WEB_ORIGIN not set, temporarily allowing all origins. ' +
+          'Set WEB_ORIGIN on the next deploy to lock down CORS.',
+      );
+      return ['*'];
+    }
+    throw new Error(
+      'WEB_ORIGIN environment variable is required for production deploys. ' +
+        'Set it to the CloudFront web URL (e.g. WEB_ORIGIN=https://dXXXX.cloudfront.net). ' +
+        'For the very first deploy, use FIRST_PROD_DEPLOY=FIRST_DEPLOY to skip this check.',
+    );
   }
   return [origin];
 })();

@@ -1,11 +1,11 @@
-name: Lint
+name: Validate
 
 on:
   workflow_call:
 
 jobs:
-  lint:
-    name: Lint
+  validate:
+    name: Lint, build & test
     runs-on: ubuntu-latest
     steps:
       - name: Setup
@@ -13,3 +13,9 @@ jobs:
 
       - name: Run lint
         run: pnpm lint
+
+      - name: TypeScript build
+        run: pnpm build
+
+      - name: Run tests
+        run: pnpm --filter functions test

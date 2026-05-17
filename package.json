@@ -16,6 +16,7 @@
     "typecheck": "tsc --build",
     "deploy-dev": "AWS_PROFILE=uweather pnpm sst deploy --stage dev",
     "deploy-prod": "AWS_PROFILE=uweather pnpm sst deploy --stage prod",
+    "deploy-prod-first": "FIRST_PROD_DEPLOY=FIRST_DEPLOY AWS_PROFILE=uweather pnpm sst deploy --stage prod",
     "prepare": "husky"
   },
   "devDependencies": {

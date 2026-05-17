@@ -71,7 +71,9 @@ All services used in the project, grouped by concern:
 ```bash
 pnpm install                     # install all workspace deps
 pnpm sst dev                     # start SST dev mode (live Lambda)
-pnpm sst deploy --stage prod     # deploy to production
+pnpm deploy-dev                  # deploy to dev stage
+pnpm deploy-prod                 # deploy to prod (requires WEB_ORIGIN env var)
+pnpm deploy-prod-first           # first prod deploy (CORS temporarily open)
 pnpm --filter web dev            # local web dev server
 ```
 

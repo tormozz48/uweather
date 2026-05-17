@@ -16,6 +16,27 @@
 import { api } from './api.ts';
 import { wsUrl } from './realtime.ts';
 
+// ── Security response headers ────────────────────────────────────────────────
+//
+// CloudFront Response Headers Policy adds standard security headers to every
+// response from the SPA distribution. These prevent clickjacking, MIME-sniffing,
+// and enforce a basic content-security policy.
+
+const securityHeadersPolicy = new aws.cloudfront.ResponseHeadersPolicy('WebSecurityHeaders', {
+  name: $interpolate`uweather-${$app.stage}-security-headers`,
+  securityHeadersConfig: {
+    contentTypeOptions: { override: true },
+    frameOptions: { frameOption: 'DENY', override: true },
+    referrerPolicy: { referrerPolicy: 'strict-origin-when-cross-origin', override: true },
+    strictTransportSecurity: {
+      accessControlMaxAgeSec: 31_536_000,
+      includeSubdomains: true,
+      override: true,
+    },
+    xssProtection: { modeBlock: true, protection: true, override: true },
+  },
+});
+
 // ── OG redirect injection ────────────────────────────────────────────────────
 //
 // SST's StaticSite creates its own viewer-request CloudFront Function for SPA
@@ -49,6 +70,18 @@ export const web = new sst.aws.StaticSite('Web', {
   // Inject bot-detection into SST's viewer-request CloudFront Function.
   // Returns a 302 redirect for social-media bots on /forecast/{id} paths;
   // human browsers fall through to SST's default SPA routing.
+  // Attach security response headers policy to the CloudFront distribution
+  transform: {
+    cdn: {
+      distribution: (args) => {
+        const defaultCache = args.defaultCacheBehavior;
+        if (defaultCache && typeof defaultCache !== 'string') {
+          defaultCache.responseHeadersPolicyId = securityHeadersPolicy.id;
+        }
+      },
+    },
+  },
+
   edge: {
     viewerRequest: {
       injection: $interpolate`

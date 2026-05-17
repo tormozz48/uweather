@@ -32,7 +32,8 @@ import { forecastPipeline, orchestratorFunction } from './pipeline.ts';
 // Change ALARM_EMAIL to your preferred destination.
 // In prod, replace with a PagerDuty/OpsGenie HTTPS endpoint or routing policy.
 
-const ALARM_EMAIL = 'andrii@numica.com';
+const DEFAULT_ALARM_EMAIL = 'andrii@numica.com';
+const ALARM_EMAIL = process.env.ALARM_EMAIL?.trim() || DEFAULT_ALARM_EMAIL;
 
 export const alarmTopic = new aws.sns.Topic('AlarmTopic', {
   name: $interpolate`uweather-alarms-${$app.stage}`,

@@ -40,6 +40,15 @@ export const forecastsTable = new sst.aws.Dynamo('Forecasts', {
       projection: ['imageUrl', 'funnyText', 'weatherSummary'],
     },
   },
+  transform: {
+    table: (args) => {
+      // Enable point-in-time recovery in production for disaster recovery.
+      // Allows restoring the Forecasts table to any second within the last 35 days.
+      if ($app.stage === 'prod') {
+        args.pointInTimeRecovery = { enabled: true };
+      }
+    },
+  },
 });
 
 /**

@@ -10,10 +10,10 @@ permissions:
   contents: read
 
 jobs:
-  lint:
+  validate:
     uses: ./.github/workflows/lint.yml
 
   deploy-dev:
-    needs: lint
+    needs: validate
     uses: ./.github/workflows/deploy-dev.yml
     secrets: inherit

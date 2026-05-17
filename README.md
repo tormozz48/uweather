@@ -71,13 +71,50 @@ pnpm typecheck            # Type-check without emitting
 pnpm lint                 # Biome lint
 pnpm check                # Biome lint + format (writes)
 pnpm deploy-dev           # Deploy to dev stage
-pnpm deploy-prod          # Deploy to prod stage
+pnpm deploy-prod          # Deploy to prod stage (requires WEB_ORIGIN)
+pnpm deploy-prod-first    # First prod deploy (CORS temporarily open)
 ```
 
 ## Deployment stages
 
-- `dev` — development, used with `sst dev` for live Lambda debugging
-- `prod` — production
+- `dev` — development, used with `sst dev` for live Lambda debugging. Deployed automatically on push to `main` via GitHub Actions.
+- `prod` — production. Deployed manually via GitHub Actions `workflow_dispatch` trigger.
+
+### Production deployment
+
+Production requires a two-pass deploy because the CORS origin (CloudFront URL) isn't known until the first deployment creates the distribution.
+
+**Prerequisites (one-time):**
+
+1. Ensure Bedrock model access is approved for Claude Haiku 4.5 in your AWS region.
+2. Set secrets for the prod stage:
+
+```bash
+pnpm sst secret set OpenWeatherApiKey <key> --stage prod
+pnpm sst secret set WeatherApiKey <key> --stage prod
+pnpm sst secret set PixazoApiKey <key> --stage prod
+```
+
+**First deploy** — provisions all resources, CORS temporarily allows all origins:
+
+```bash
+pnpm deploy-prod-first
+# or via GitHub Actions: trigger "Deploy Prod" workflow with "first_deploy" checked
+```
+
+**Subsequent deploys** — lock down CORS to the CloudFront web URL from the first deploy:
+
+```bash
+WEB_ORIGIN=https://dXXXX.cloudfront.net pnpm deploy-prod
+# or via GitHub Actions: trigger "Deploy Prod" workflow with web_origin filled in
+```
+
+**Post-deploy verification:**
+
+1. `curl https://<api-url>/health` — should return 200.
+2. Trigger a forecast from the web app and verify the full pipeline runs.
+3. Confirm the SNS alarm subscription email (check inbox for AWS notification).
+4. Open the `uweather-prod` CloudWatch dashboard and verify metrics are populating.
 
 ## API
 
