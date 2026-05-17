@@ -1,12 +1,9 @@
 name: Setup
-description: Checkout repo, install pnpm, set up Node.js, and install dependencies
+description: Install pnpm, set up Node.js, and install dependencies. Repo must already be checked out.
 
 runs:
   using: composite
   steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-
     - name: Set up pnpm
       uses: pnpm/action-setup@v4
       with:
