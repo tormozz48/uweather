@@ -26,6 +26,7 @@ export default $config({
     // which accumulates cost indefinitely and makes log cleanup manual.
     // Individual functions can override by passing their own `logging` config.
     $transform(sst.aws.Function, (args) => {
+      args.runtime ??= 'nodejs24.x';
       args.logging ??= {};
       (args.logging as { retention?: string }).retention ??= '1 month';
     });
