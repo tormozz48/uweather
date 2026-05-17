@@ -11,8 +11,16 @@ import { connectionService } from '../services/connection.service.js';
 
 const log = createLogger({ function: 'ws-connect' });
 
+/**
+ * APIGatewayProxyWebsocketEventV2 omits queryStringParameters from its type
+ * even though API Gateway includes them on $connect events at runtime.
+ */
+type WebSocketConnectEvent = APIGatewayProxyWebsocketEventV2 & {
+  queryStringParameters?: Record<string, string>;
+};
+
 export async function handler(
-  event: APIGatewayProxyWebsocketEventV2,
+  event: WebSocketConnectEvent,
 ): Promise<APIGatewayProxyResultV2> {
   const connectionId = event.requestContext.connectionId;
   const executionArn = event.queryStringParameters?.executionArn;
