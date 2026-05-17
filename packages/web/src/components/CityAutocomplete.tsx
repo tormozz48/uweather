@@ -28,6 +28,7 @@ interface CityAutocompleteProps {
   geolocationStatus: GeolocationStatus;
   onCityChange: (city: string, coords?: CityCoords) => void;
   onRequestLocation: () => void;
+  size?: 'small' | 'medium';
 }
 
 export function CityAutocomplete({
@@ -36,6 +37,7 @@ export function CityAutocomplete({
   geolocationStatus,
   onCityChange,
   onRequestLocation,
+  size,
 }: CityAutocompleteProps) {
   const { suggestions, isSearching, clear } = useCitySearch(city);
 
@@ -65,6 +67,7 @@ export function CityAutocomplete({
         }
       }}
       disabled={isLoading}
+      size={size}
       sx={{ flex: 1 }}
       renderInput={(params) => (
         <TextField
