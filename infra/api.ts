@@ -60,10 +60,6 @@ const allowedOrigins = (() => {
   if ($app.stage !== 'prod') return ['*'];
   const origin = process.env.WEB_ORIGIN?.trim();
   if (!origin) {
-    console.warn(
-      '[api] WEB_ORIGIN is not set for the prod stage — CORS allowOrigins is open (*).' +
-        ' Set WEB_ORIGIN to the web SPA CloudFront URL to restrict access.',
-    );
     return ['*'];
   }
   return [origin];

@@ -5,6 +5,7 @@
  * A ResizeObserver keeps measurements current whenever the container resizes
  * (viewport change, panel open/close, etc.).
  */
+import type { MutableRefObject, RefObject } from 'react';
 import { useCallback, useLayoutEffect, useState } from 'react';
 
 /** Diagram-relative pixel coordinates of one connection line. */
@@ -22,8 +23,8 @@ export interface SvgDimensions {
 }
 
 export function usePipelineConnections(
-  diagramRef: React.RefObject<HTMLDivElement | null>,
-  rowEls: React.MutableRefObject<(HTMLDivElement | null)[]>,
+  diagramRef: RefObject<HTMLDivElement | null>,
+  rowEls: MutableRefObject<(HTMLDivElement | null)[]>,
   rowCount: number,
 ): { geoms: ConnectionGeometry[]; svgDims: SvgDimensions } {
   const [geoms, setGeoms] = useState<ConnectionGeometry[]>([]);

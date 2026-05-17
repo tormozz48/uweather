@@ -2,7 +2,7 @@
  * Shared mock data for Storybook stories.
  * Centralises realistic fixtures so every story stays consistent.
  */
-import type { ForecastResponse } from '../api';
+import type { ForecastResponse } from '../api.ts';
 
 export const MOCK_FORECAST: ForecastResponse = {
   forecastId: 'fc-abc-123',

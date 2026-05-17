@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
-import { MOCK_FORECAST, MOCK_HISTORY } from '../stories/mocks';
-import { HistoryList } from './HistoryList';
+import { MOCK_FORECAST, MOCK_HISTORY } from '../stories/mocks.ts';
+import { HistoryList } from './HistoryList.tsx';
 
 const meta: Meta<typeof HistoryList> = {
   title: 'Components/HistoryList',

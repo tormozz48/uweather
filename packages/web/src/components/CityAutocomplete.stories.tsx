@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
-import { CityAutocomplete } from './CityAutocomplete';
+import { CityAutocomplete } from './CityAutocomplete.tsx';
 
 const meta: Meta<typeof CityAutocomplete> = {
   title: 'Components/CityAutocomplete',

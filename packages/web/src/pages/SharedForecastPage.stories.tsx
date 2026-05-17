@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { SharedForecastPage } from './SharedForecastPage';
+import { SharedForecastPage } from './SharedForecastPage.tsx';
 
 const meta: Meta<typeof SharedForecastPage> = {
   title: 'Pages/SharedForecastPage',

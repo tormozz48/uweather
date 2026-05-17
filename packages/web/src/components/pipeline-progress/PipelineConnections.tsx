@@ -88,8 +88,9 @@ export function PipelineConnections({ geoms, svgDims, rowStatuses }: Props) {
               `${geom.x2 + ARROWHEAD_HALF_WIDTH_PX},${arrowBaseY}`,
             ].join(' ');
 
+            const connectionKey = `${geom.x1}-${geom.y1}-${geom.x2}-${geom.y2}`;
             return (
-              <g key={connectionIndex}>
+              <g key={connectionKey}>
                 <line
                   x1={geom.x1}
                   y1={geom.y1}

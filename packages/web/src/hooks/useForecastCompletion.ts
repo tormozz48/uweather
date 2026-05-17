@@ -18,8 +18,6 @@ interface LoadingState {
   executionArn: string;
 }
 
-type SetState<T> = (updater: T | ((prev: T) => T)) => void;
-
 interface UseForecastCompletionParams {
   progress: PipelineProgress;
   state: { status: string; executionArn?: string };

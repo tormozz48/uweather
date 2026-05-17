@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { Stat } from './Stat';
+import { Stat } from './Stat.tsx';
 
 const meta: Meta<typeof Stat> = {
   title: 'Components/Stat',

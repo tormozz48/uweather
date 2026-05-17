@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { MOCK_FORECAST, MOCK_FORECAST_RAIN, MOCK_FORECAST_SNOW } from '../stories/mocks';
-import { ForecastImage } from './ForecastImage';
+import { MOCK_FORECAST, MOCK_FORECAST_RAIN, MOCK_FORECAST_SNOW } from '../stories/mocks.ts';
+import { ForecastImage } from './ForecastImage.tsx';
 
 const meta: Meta<typeof ForecastImage> = {
   title: 'Components/ForecastImage',

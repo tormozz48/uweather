@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import type { PipelineStageId } from '@uweather/core';
-import type { StageStatus } from '../hooks/usePipelineProgress';
-import { PipelineProgress } from './PipelineProgress';
+import type { StageStatus } from '../hooks/usePipelineProgress.ts';
+import { PipelineProgress } from './PipelineProgress.tsx';
 
 /** Build a full stages record with explicit overrides. */
 function buildStages(

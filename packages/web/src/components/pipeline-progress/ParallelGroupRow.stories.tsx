@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import type { PipelineStageId } from '@uweather/core';
-import type { StageStatus } from '../../hooks/usePipelineProgress';
-import { ParallelGroupRow } from './ParallelGroupRow';
+import type { StageStatus } from '../../hooks/usePipelineProgress.ts';
+import { ParallelGroupRow } from './ParallelGroupRow.tsx';
 
 /** Helper to build a full stages record with a given default status. */
 function buildStages(

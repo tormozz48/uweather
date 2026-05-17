@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
-import { LanguageSelect } from './LanguageSelect';
+import { LanguageSelect } from './LanguageSelect.tsx';
 
 const meta: Meta<typeof LanguageSelect> = {
   title: 'Components/LanguageSelect',

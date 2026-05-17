@@ -2,7 +2,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider } from '@mui/material/styles';
 import type { Decorator, Preview } from '@storybook/react';
 import React from 'react';
-import { theme } from '../src/theme';
+import { theme } from '../src/theme.ts';
 
 /**
  * Global MUI theme decorator — wraps every story in the uweather dark

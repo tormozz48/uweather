@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { StageChip } from './StageChip';
+import { StageChip } from './StageChip.tsx';
 
 const meta: Meta<typeof StageChip> = {
   title: 'Components/PipelineProgress/StageChip',

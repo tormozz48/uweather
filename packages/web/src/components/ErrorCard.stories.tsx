@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
-import { ErrorCard } from './ErrorCard';
+import { ErrorCard } from './ErrorCard.tsx';
 
 const meta: Meta<typeof ErrorCard> = {
   title: 'Components/ErrorCard',

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { MOCK_FORECAST, MOCK_FORECAST_RAIN } from '../stories/mocks';
-import { ForecastSection } from './ForecastSection';
+import { MOCK_FORECAST, MOCK_FORECAST_RAIN } from '../stories/mocks.ts';
+import { ForecastSection } from './ForecastSection.tsx';
 
 const meta: Meta<typeof ForecastSection> = {
   title: 'Components/ForecastSection',
