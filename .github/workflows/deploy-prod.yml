@@ -2,16 +2,6 @@ name: Deploy Prod
 
 on:
   workflow_dispatch:
-    inputs:
-      web_origin:
-        description: 'CloudFront web URL for CORS (e.g. https://dXXXX.cloudfront.net). Leave empty for first deploy only.'
-        required: false
-        type: string
-      first_deploy:
-        description: 'Check ONLY for the very first prod deploy (skips WEB_ORIGIN requirement)'
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   id-token: write
@@ -28,14 +18,6 @@ jobs:
     environment: prod
 
     steps:
-      - name: Validate inputs
-        run: |
-          if [[ "${{ inputs.first_deploy }}" != "true" && -z "${{ inputs.web_origin }}" ]]; then
-            echo "::error::WEB_ORIGIN is required for production deploys. Provide the CloudFront URL or check 'first_deploy' for initial deployment."
-            exit 1
-          fi
-        shell: bash
-
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -49,7 +31,4 @@ jobs:
           aws-region: us-east-1
 
       - name: Deploy
-        env:
-          WEB_ORIGIN: ${{ inputs.web_origin }}
-          FIRST_PROD_DEPLOY: ${{ inputs.first_deploy == true && 'FIRST_DEPLOY' || '' }}
         run: pnpm sst deploy --stage prod
