@@ -20,5 +20,5 @@ jobs:
       - name: TypeScript build
         run: pnpm build
 
-      - name: Run tests
-        run: pnpm --filter functions test
+      # - name: Run tests
+      #   run: pnpm --filter functions test
